@@ -2,7 +2,7 @@ from treelib import Node, Tree
 import numpy as np
 
 class GeoUnit(object):
-    """ This class stores the data required inside each Node in the tree.
+    """ This class stores the data inside each Node in the tree.
     """
     def __init__(self, name, parent, unnoised_pop, identifier=None):
         """ Args:
@@ -20,10 +20,15 @@ class GeoUnit(object):
             self.identifier = name
 
 class ToyClown(Tree):
-    def __init__(self, geounits, num_levels, eps_budget, eps_splits):
+    def __init__(self, hierarchy, eps_budget, eps_splits):
         """ Initializes the Tree and populates it.
 
-            geounits   : List of GeoUnits that will form the nodes of the Tree.
+            hierarchy  : List of tuples of the form (name, branching, population) sorted 
+                         in decreasing order of geographic nesting for eg.
+                         [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
+                         has 1 Country of population 810, 3 States of population 270 each,
+                         3 Counties in each State of population 90 each and 3 Dists in each County of 
+                         population 30 each.
             eps_budget : Float, Epsilon budget across all levels
             eps_splits : List denoting the % of splits in epsilon value by level
                          eg. if the hierarchy is [Country, State, County, District] then
@@ -31,16 +36,49 @@ class ToyClown(Tree):
         """
         super(ToyClown, self).__init__()
         self.eps_budget = eps_budget
+        
+        # create nodes and populate the tree
+        geounits = []
+        self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
         self.populate_tree(geounits)
+        
         self.add_levels_to_node(self.get_node(self.root), 0)
-        self.eps_values = self.epsilon_values(num_levels, eps_splits, eps_budget)
+        self.eps_values = self.epsilon_values(eps_splits, eps_budget)
+        
+    def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
+        """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
+        
+            Args:
+                hierarchy : List of tuples of the form (name, branching, population) sorted 
+                            in decreasing order of geographic nesting for eg.
+                            [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
+                            has 1 Country of population 810, 3 States of population 270 each,
+                            3 Counties in each State of population 90 each and 3 Dists in each County of 
+                            population 30 each.
+                level     : Int, index of the `hierarchy` we are currently at
+                parent    : Name of the parent of the GeoUnits we are building 
+                all_units : List of GeoUnits that stores all the GeoUnits built in this recursive function.
+                
+        """
+        if level == len(hierarchy):
+            return
+        if level == 0:
+            # build root
+            name, branching, pop = hierarchy[level]
+            all_units.append(GeoUnit(name, None, pop))
+            self.add_geounits_at_level_to_list(hierarchy, level+1, name, all_units)
+        else:
+            name, branching, pop = hierarchy[level]
+            for i in range(branching):
+                curr_name = parent + name + str(i+1)
+                all_units.append(GeoUnit(curr_name, parent, pop))
+                self.add_geounits_at_level_to_list(hierarchy, level+1, curr_name, all_units)
 
-    def epsilon_values(self, num_levels, eps_splits, eps_budget):
+    def epsilon_values(self, eps_splits, eps_budget):
         """ Stores the epsilon values as a List of Floats.
             The eps_values list should be in decreasing order of size
             eg [Country, State, County, Tract, BlockGroup, Block]
         """
-        assert(len(eps_splits) == num_levels)
         eps_values = []
 
         for fraction in eps_splits:
