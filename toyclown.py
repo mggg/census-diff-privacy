@@ -88,6 +88,9 @@ class ToyClown(Tree):
 
     def adjust_children(self, node):
         """ Adjusts the children to add up to the parent.
+            
+            Also add the "error" attribute to the node, which is the difference
+            between the adjusted population and the unnoised population of the node.
         """
         noised = 0
 
@@ -101,6 +104,7 @@ class ToyClown(Tree):
         # go to each child, add/subtract that constant
         for child in self.children(node.identifier):
             child.data.adjusted_pop = child.data.noised_pop + constant
+            child.data.error = child.data.adjusted_pop - child.data.unnoised_pop
 
     def noise_and_adjust(self):
         """ Noises each node in the Tree and adjusts them to add back to their parent.
