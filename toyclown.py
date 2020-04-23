@@ -60,12 +60,14 @@ class ToyClown(Tree):
 
 
     def add_laplacian_noise(self, node, epsilon):
-        """ Adds Laplacian noise of parameter 1/`epsilon` to Node `node`
+        """ Adds Laplacian noise of parameter 1/`epsilon` to Node `node`. If `epsilon` is 0, 
+            adds no noise.
         """
         if epsilon == 0:
-            return
+            noise = 0
+        else:
+            noise = np.random.laplace(loc=0, scale=1/epsilon)
 
-        noise = np.random.laplace(loc=0, scale=1/epsilon)
         node.data.noised_pop = node.data.unnoised_pop + noise
         node.data.noise = noise
         node.data.noise_type = "laplacian"
@@ -102,6 +104,8 @@ class ToyClown(Tree):
 
     def noise_and_adjust(self):
         """ Noises each node in the Tree and adjusts them to add back to their parent.
+            This function simply serves as a wrapper function to the recursive 
+            __noise_and_adjust_children(), and is started at the root of the tree.
         """
         self.__noise_and_adjust_children(self.get_node(self.root))
 
@@ -112,17 +116,14 @@ class ToyClown(Tree):
         if node.is_leaf():
             return
         elif node.is_root():
-            node.data.noise = 0
-            node.data.noised_pop = node.data.unnoised_pop
-            node.data.adjusted_pop = node.data.unnoised_pop
+            # add noise to root. No adjustment is done on the root.
+            self.add_laplacian_noise(node, self.eps_values[node.data.level])
+            node.data.adjusted_pop = node.data.noised_pop
 
-            self.noise_children(node)
-            self.adjust_children(node)
+        # noise and adjust
+        self.noise_children(node)
+        self.adjust_children(node)
 
-            for child in self.children(node.identifier):
-                self.__noise_and_adjust_children(child)
-        else:
-            self.noise_children(node)
-            self.adjust_children(node)
-            for child in self.children(node.identifier):
-                self.__noise_and_adjust_children(child)
+        # recurse
+        for child in self.children(node.identifier):
+            self.__noise_and_adjust_children(child)
