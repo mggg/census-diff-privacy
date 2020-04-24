@@ -154,6 +154,8 @@ class ToyClown(Tree):
     def __noise_and_adjust_children(self, node):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
+            
+            If at root, noises + adjusts both the root and the children of the root.
         """
         if node.is_leaf():
             return
@@ -161,6 +163,7 @@ class ToyClown(Tree):
             # add noise to root. No adjustment is done on the root.
             self.add_laplacian_noise(node, self.eps_values[node.data.level])
             node.data.adjusted_pop = node.data.noised_pop
+            node.data.error = node.data.adjusted_pop - node.data.unnoised_pop
 
         # noise and adjust
         self.noise_children(node)
