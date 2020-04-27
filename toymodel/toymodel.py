@@ -1,5 +1,7 @@
 from treelib import Node, Tree
+from errors import SumError
 import numpy as np
+import math
 
 class GeoUnit(object):
     """ This class stores the data inside each Node in the tree.
@@ -41,6 +43,7 @@ class ToyModel(Tree):
         geounits = []
         self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
         self.populate_tree(geounits)
+        self.print_unnoised_totaling_errors(self.get_node(self.root))
 
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
@@ -149,7 +152,9 @@ class ToyModel(Tree):
             This function simply serves as a wrapper function to the recursive
             __noise_and_adjust_children(), and is started at the root of the tree.
         """
-        self.__noise_and_adjust_children(self.get_node(self.root))
+        root = self.get_node(self.root)
+        self.__noise_and_adjust_children(root)
+        self.print_adjusted_totaling_errors(root)
 
     def __noise_and_adjust_children(self, node):
         """ Recursively noises children and then "adjusts" the children to sum
@@ -172,3 +177,45 @@ class ToyModel(Tree):
         # recurse
         for child in self.children(node.identifier):
             self.__noise_and_adjust_children(child)
+
+    def print_adjusted_totaling_errors(self, node, abs_tol=0.00005):
+        """
+            Prints the node's name if the ".adjusted_pop" attribute of the
+            node's children does not sum up to it's own ".adjusted_pop" upto
+            a precision of `abs_tol`.
+        """
+        if node.is_leaf():
+            return
+        else:
+            children_total = sum([child.data.adjusted_pop for child in self.children(node.identifier)])
+
+            if not math.isclose(node.data.adjusted_pop, children_total, abs_tol=abs_tol):
+                # print("Expected ", node.data.adjusted_pop, " but the children totaled to ",
+                #       children_total, " for node ", node.tag)
+                raise SumError("Expected {} but the children totaled " \
+                               "to {} for node {}".format(node.data.adjusted_pop,
+                                                          children_total,
+                                                          node.tag))
+
+            for child in self.children(node.identifier):
+                self.print_adjusted_totaling_errors(child)
+
+    def print_unnoised_totaling_errors(self, node, abs_tol=0.00005):
+        """
+            Prints the node's name if the ".unnoised_pop" attribute of the
+            node's children does not sum up to it's own ".unnoised_pop" upto
+            a precision of `abs_tol`.
+        """
+        if node.is_leaf():
+            return
+        else:
+            children_total = sum([child.data.unnoised_pop for child in self.children(node.identifier)])
+
+            if not math.isclose(node.data.unnoised_pop, children_total, abs_tol=abs_tol):
+                raise SumError("Expected {} but the children totaled " \
+                               "to {} for node {}".format(node.data.unnoised_pop,
+                                                          children_total,
+                                                          node.tag))
+
+            for child in self.children(node.identifier):
+                self.print_unnoised_totaling_errors(child)
