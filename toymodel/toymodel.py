@@ -19,46 +19,46 @@ class GeoUnit(object):
         else:
             self.identifier = name
 
-class ToyClown(Tree):
+class ToyModel(Tree):
     def __init__(self, hierarchy, eps_budget, eps_splits):
         """ Initializes the Tree and populates it.
 
-            hierarchy  : List of tuples of the form (name, branching, population) sorted 
+            hierarchy  : List of tuples of the form (name, branching, population) sorted
                          in decreasing order of geographic nesting for eg.
                          [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
                          has 1 Country of population 810, 3 States of population 270 each,
-                         3 Counties in each State of population 90 each and 3 Dists in each County of 
+                         3 Counties in each State of population 90 each and 3 Dists in each County of
                          population 30 each.
             eps_budget : Float, Epsilon budget across all levels
             eps_splits : List denoting the % of splits in epsilon value by level
                          eg. if the hierarchy is [Country, State, County, District] then
                          the eps_splits could look like [0, 0.33, 0.33, 0.34]
         """
-        super(ToyClown, self).__init__()
+        super(ToyModel, self).__init__()
         self.eps_budget = eps_budget
-        
+
         # create nodes and populate the tree
         geounits = []
         self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
         self.populate_tree(geounits)
-        
+
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
-        
+
     def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
         """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
-        
+
             Args:
-                hierarchy : List of tuples of the form (name, branching, population) sorted 
+                hierarchy : List of tuples of the form (name, branching, population) sorted
                             in decreasing order of geographic nesting for eg.
                             [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
                             has 1 Country of population 810, 3 States of population 270 each,
-                            3 Counties in each State of population 90 each and 3 Dists in each County of 
+                            3 Counties in each State of population 90 each and 3 Dists in each County of
                             population 30 each.
                 level     : Int, index of the `hierarchy` we are currently at
-                parent    : Name of the parent of the GeoUnits we are building 
+                parent    : Name of the parent of the GeoUnits we are building
                 all_units : List of GeoUnits that stores all the GeoUnits built in this recursive function.
-                
+
         """
         if level == len(hierarchy):
             return
@@ -98,7 +98,7 @@ class ToyClown(Tree):
 
 
     def add_laplacian_noise(self, node, epsilon):
-        """ Adds Laplacian noise of parameter 1/`epsilon` to Node `node`. If `epsilon` is 0, 
+        """ Adds Laplacian noise of parameter 1/`epsilon` to Node `node`. If `epsilon` is 0,
             adds no noise.
         """
         if epsilon == 0:
@@ -126,7 +126,7 @@ class ToyClown(Tree):
 
     def adjust_children(self, node):
         """ Adjusts the children to add up to the parent.
-            
+
             Also add the "error" attribute to the node, which is the difference
             between the adjusted population and the unnoised population of the node.
         """
@@ -146,7 +146,7 @@ class ToyClown(Tree):
 
     def noise_and_adjust(self):
         """ Noises each node in the Tree and adjusts them to add back to their parent.
-            This function simply serves as a wrapper function to the recursive 
+            This function simply serves as a wrapper function to the recursive
             __noise_and_adjust_children(), and is started at the root of the tree.
         """
         self.__noise_and_adjust_children(self.get_node(self.root))
@@ -154,7 +154,7 @@ class ToyClown(Tree):
     def __noise_and_adjust_children(self, node):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
-            
+
             If at root, noises + adjusts both the root and the children of the root.
         """
         if node.is_leaf():
