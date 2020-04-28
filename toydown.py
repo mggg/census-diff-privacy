@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy.optimize import minimize
-from treelib import Node, treelib
+from treelib import Node, Tree
 
 class GeoUnit(object):
     """ This class stores the data inside each Node in the tree.
@@ -15,11 +15,12 @@ class GeoUnit(object):
                 identifier   : Str, A string that is unique to the Node in the entire Tree
         """
         self.name = name
-        self.unnoised_pop = unnoised_pop
         self.parent = parent
         self.attributes = attributes
         self.identifier = identifier if identifier else name
 
+
+class ToyDown(Tree):
     def __init__(self, geounits, num_levels, eps_budget, eps_splits):
         """ Initializes the Tree and populates it.
             geounits   : List of GeoUnits that will form the nodes of the Tree.
@@ -28,7 +29,7 @@ class GeoUnit(object):
                          eg. if the hierarchy is [Country, State, County, District] then
                          the eps_splits could look like [0, 0.33, 0.33, 0.34]
         """
-        super(ToyClown, self).__init__()
+        super(ToyDown, self).__init__()
         self.eps_budget = eps_budget
         self.populate_tree(geounits)
         self.add_levels_to_node(self.get_node(self.root), 0)
@@ -67,7 +68,7 @@ class GeoUnit(object):
         if epsilon == 0:
             noise = np.full(shape, 0)
         else:
-            noise = np.random.laplace(scale=1/epsilon, shape=shape)
+            noise = np.random.laplace(scale=1/epsilon, size=shape)
 
         node.data.noised = node.data.attributes + noise
         node.data.noise = noise
@@ -96,8 +97,10 @@ class GeoUnit(object):
         children = self.children(node.identifier)
         num_attributes = node.data.attributes.shape[0]
         num_children = len(children)
-        noised_children = np.append([child.data.noised for child in children])
-        unnoised_children = np.append([child.data.attributes for child in children])
+        noised_children = np.append([], [child.data.noised for child in children])
+        unnoised_children = np.append([], [child.data.attributes for child in children])
+        
+        if bounds == "non-negative" : bounds = [(0, None)]*(num_children*num_attributes)
 
         if parental_equality:
             cons_children = [{'type': 'eq', 'fun': lambda x: np.dot(adj_par - np.sum(x.reshape(num_children, num_attributes), axis=0),
@@ -105,13 +108,14 @@ class GeoUnit(object):
             if not node_cons:
                 cons = cons_children
             else:
-                cons = node_cons + cons_children
+                cons = node_cons(num_children) + cons_children
 
-        adj = minimize(objective_fun(noised_children), truth, constraints=cons, bounds=bounds, options=opts)
+        adj = minimize(objective_fun(noised_children), unnoised_children, constraints=cons, bounds=bounds, options=opts)
         adjusted_children = adj.x
 
         for i, adjusted_child in enumerate(np.split(adjusted_children, num_children)):
             children[i].data.adjusted = adjusted_child
+            children[i].data.error = children[i].data.attributes - children[i].data.adjusted
 
     def noise_and_adjust(self, objective_fun="L1", node_cons=None, bounds="non-negative", 
                          parental_equality=True, opts=None):
@@ -122,8 +126,9 @@ class GeoUnit(object):
             objective_fun     : Function to minimize over.  If "L1" uses the L1 norm, otherwise
                                 takes a function that takes a noised point, and returns a function that
                                 takes a point x and returns a scalar distance between the two points.
-            node_cons         : List of constraints for the readjustment of a Node is subject
-                                to.  Has form [{"type": "eq/ineq", "fun": lambda x: }]
+            node_cons         : Function that takes the number of children, n, and returns a list of constraints 
+                                for the readjustment of a Node is subject to. 
+                                Has form [{"type": "eq/ineq", "fun": lambda x: }]
                                 See scipy.optimize constraint specification for more details.
             bounds            : (min, max) pairs for each element in x, defining the bounds on that parameter. 
                                 Use None for one of min or max when there is no bound in that direction.
@@ -135,22 +140,29 @@ class GeoUnit(object):
 
         root = self.get_node(self.root)
         num_attributes = root.data.attributes.shape[0]
-        if bounds == "non-negative" : bounds = [(0, None)]*num_attributes
         if objective_fun == "L1": objective_fun = lambda n: lambda x: sp.linalg.norm(x-n, ord=1)
 
-        self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds, parental_equality)
+        self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds, parental_equality, opts)
 
     def __noise_and_adjust_children(self, node, objective_fun, node_cons, bounds, 
                                     parental_equality, opts):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
         """
+        print(node.data.name)
         if node.is_leaf():
             return
         elif node.is_root():
             # add noise to root. No adjustment is done on the root.
             self.add_laplacian_noise(node, self.eps_values[node.data.level])
-            node.data.adjusted = node.data.noised
+            
+            bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
+            
+            adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
+                           constraints=node_cons(1), bounds=bnds, options=opts)
+            
+            node.data.adjusted = adj.x
+            node.data.error = node.data.attributes - node.data.adjusted
 
         # noise and adjust
         self.noise_children(node)
