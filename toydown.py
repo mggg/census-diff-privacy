@@ -158,8 +158,9 @@ class ToyDown(Tree):
             
             bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
             
+            cons = node_cons if not node_cons else node_cons(1)
             adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
-                           constraints=node_cons(1), bounds=bnds, options=opts)
+                           constraints=cons, bounds=bnds, options=opts)
             
             node.data.adjusted = adj.x
             node.data.error = node.data.attributes - node.data.adjusted
