@@ -109,7 +109,8 @@ class ToyDown(Tree):
                 cons = cons_children
             else:
                 cons = node_cons(num_children) + cons_children
-
+        
+        print("Adjusting children of {}".format(node.data.name))
         adj = minimize(objective_fun(noised_children), unnoised_children, constraints=cons, bounds=bounds, options=opts)
         adjusted_children = adj.x
 
@@ -149,7 +150,7 @@ class ToyDown(Tree):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
         """
-        print(node.data.name)
+        
         if node.is_leaf():
             return
         elif node.is_root():
@@ -159,6 +160,7 @@ class ToyDown(Tree):
             bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
             
             cons = node_cons if not node_cons else node_cons(1)
+            print("Adjusting root node {}".format(node.data.name))
             adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
                            constraints=cons, bounds=bnds, options=opts)
             
