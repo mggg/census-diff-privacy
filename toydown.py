@@ -90,7 +90,7 @@ class ToyDown(Tree):
         for child in children:
             self.add_laplacian_noise(child, self.eps_values[child.data.level])
 
-    def adjust_children(self, node, objective_fun, node_cons, bounds, parental_equality, opts):
+    def adjust_children(self, node, objective_fun, node_cons, bounds, parental_equality, maxiter, verbose):
         """ Adjusts the children to add up to the parent.
         """
         adj_par = node.data.adjusted
@@ -110,8 +110,9 @@ class ToyDown(Tree):
             else:
                 cons = node_cons(num_children) + cons_children
         
-        print("Adjusting children of {}".format(node.data.name))
-        adj = minimize(objective_fun(noised_children), unnoised_children, constraints=cons, bounds=bounds, options=opts)
+        if verbose: print("Adjusting children of {}".format(node.data.name))
+        adj = minimize(objective_fun(noised_children), unnoised_children, constraints=cons, 
+                       bounds=bounds, options={"maxiter": maxiter, "disp": verbose})
         adjusted_children = adj.x
 
         for i, adjusted_child in enumerate(np.split(adjusted_children, num_children)):
@@ -119,7 +120,7 @@ class ToyDown(Tree):
             children[i].data.error = children[i].data.attributes - children[i].data.adjusted
 
     def noise_and_adjust(self, objective_fun="L1", node_cons=None, bounds="non-negative", 
-                         parental_equality=True, opts=None):
+                         parental_equality=True, maxiter=200, verbose=False):
         """ Noises each node in the Tree and adjusts them to add back to their parent.
             This function simply serves as a wrapper function to the recursive 
             __noise_and_adjust_children(), and is started at the root of the tree.
@@ -143,10 +144,11 @@ class ToyDown(Tree):
         num_attributes = root.data.attributes.shape[0]
         if objective_fun == "L1": objective_fun = lambda n: lambda x: sp.linalg.norm(x-n, ord=1)
 
-        self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds, parental_equality, opts)
+        self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds, parental_equality, 
+                                         maxiter, verbose)
 
     def __noise_and_adjust_children(self, node, objective_fun, node_cons, bounds, 
-                                    parental_equality, opts):
+                                    parental_equality, maxiter, verbose):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
         """
@@ -160,18 +162,18 @@ class ToyDown(Tree):
             bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
             
             cons = node_cons if not node_cons else node_cons(1)
-            print("Adjusting root node {}".format(node.data.name))
+            if verbose: print("Adjusting root node {}".format(node.data.name))
             adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
-                           constraints=cons, bounds=bnds, options=opts)
+                           constraints=cons, bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
             
             node.data.adjusted = adj.x
             node.data.error = node.data.attributes - node.data.adjusted
 
         # noise and adjust
         self.noise_children(node)
-        self.adjust_children(node, objective_fun, node_cons, bounds, parental_equality, opts)
+        self.adjust_children(node, objective_fun, node_cons, bounds, parental_equality, maxiter, verbose)
 
         # recurse
         for child in self.children(node.identifier):
             self.__noise_and_adjust_children(child, objective_fun, node_cons, 
-                                             bounds, parental_equality, opts)
+                                             bounds, parental_equality, maxiter, verbose)
