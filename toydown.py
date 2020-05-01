@@ -21,7 +21,7 @@ class GeoUnit(object):
 
 
 class ToyDown(Tree):
-    def __init__(self, geounits, num_levels, eps_budget, eps_splits):
+    def __init__(self, geounits, num_levels, eps_budget, eps_splits, parallel=False):
         """ Initializes the Tree and populates it.
             geounits   : List of GeoUnits that will form the nodes of the Tree.
             eps_budget : Float, Epsilon budget across all levels
@@ -34,6 +34,7 @@ class ToyDown(Tree):
         self.populate_tree(geounits)
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.eps_values = self.epsilon_values(num_levels, eps_splits, eps_budget)
+        self.parallel = parallel
 
     def epsilon_values(self, num_levels, eps_splits, eps_budget):
         """ Stores the epsilon values as a List of Floats.
@@ -144,10 +145,45 @@ class ToyDown(Tree):
         num_attributes = root.data.attributes.shape[0]
         if objective_fun == "L1": objective_fun = lambda n: lambda x: sp.linalg.norm(x-n, ord=1)
 
-        self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds, parental_equality, 
-                                         maxiter, verbose)
+        if self.parallel:
+            self.__noise_and_adjust_children_async(root, objective_fun, node_cons, bounds,
+                                                   parental_equality, maxiter, verbose)
+        else:
+            self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds,
+                                             parental_equality, maxiter, verbose)
 
     def __noise_and_adjust_children(self, node, objective_fun, node_cons, bounds, 
+                                    parental_equality, maxiter, verbose):
+        """ Recursively noises children and then "adjusts" the children to sum
+            up to the population of the parent.
+        """
+        
+        if node.is_leaf():
+            return
+        elif node.is_root():
+            # add noise to root. No adjustment is done on the root.
+            self.add_laplacian_noise(node, self.eps_values[node.data.level])
+            
+            bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
+            
+            cons = node_cons if not node_cons else node_cons(1)
+            if verbose: print("Adjusting root node {}".format(node.data.name))
+            adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
+                           constraints=cons, bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
+            
+            node.data.adjusted = adj.x
+            node.data.error = node.data.attributes - node.data.adjusted
+
+        # noise and adjust
+        self.noise_children(node)
+        self.adjust_children(node, objective_fun, node_cons, bounds, parental_equality, maxiter, verbose)
+
+        # recurse
+        for child in self.children(node.identifier):
+            self.__noise_and_adjust_children(child, objective_fun, node_cons, 
+                                             bounds, parental_equality, maxiter, verbose)
+
+    def __noise_and_adjust_children_async(self, node, objective_fun, node_cons, bounds, 
                                     parental_equality, maxiter, verbose):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
