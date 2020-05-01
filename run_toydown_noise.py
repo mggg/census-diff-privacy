@@ -81,7 +81,7 @@ print("Running Model")
 noised_counts = np.zeros((N_SAMPS, NUM_LEAVES, NUM_COLS))
 
 for i in range(N_SAMPS):
-    noised_counts[i] = toydown_noise(LEAVES, model, n_leaves=NUM_LEAVES)
+    noised_counts[i] = toydown_noise(LEAF_NAMES, model, n_leaves=NUM_LEAVES)
     if i % (N_SAMPS/10) == 0: print("*", end="", flush=True)
 
 print()
