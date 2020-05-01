@@ -68,12 +68,13 @@ def toydown_noise(leaves, model, cons=cons_0_diff, n_leaves=None):
     return noised_counts
 
 print("Setting up model")
+print("Total epsilon budget: {}".format(args.eps))
+print("Epsilon Split: {}".format(args.eps_splits))
 geounits = create_tree_from_leaves(LEAVES)
 geounits.reverse()
+print(len(geounits))
 model = ToyDown(geounits, 3, EPS, EPS_SPLIT)
 
-print(args.eps)
-print(args.eps_splits)
 model.show()
 
 print("Running Model")
@@ -81,14 +82,14 @@ noised_counts = np.zeros((N_SAMPS, NUM_LEAVES, NUM_COLS))
 
 for i in range(N_SAMPS):
     noised_counts[i] = toydown_noise(LEAVES, model, n_leaves=NUM_LEAVES)
-    if i % 100 == 0: print("*", end="", flush=True)
+    if i % (N_SAMPS/10) == 0: print("*", end="", flush=True)
 
 print()
 
 
 print("Saving Results")
 
-output = "data/ToyDownNoised_budget_{}_eps_{}_samps_{}.p".format(EPS, EPS_SPLIT, N_SAMPS)
+output = "data/ToyDownNoised_budget_{}_eps_[{}]_samps_{}.p".format(EPS, ",".join(str(n) for n in EPS_SPLIT), N_SAMPS)
 
 with open(output, "wb") as f_out:
     pickle.dump(noised_counts, f_out)
