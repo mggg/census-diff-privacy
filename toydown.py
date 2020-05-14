@@ -2,6 +2,7 @@ import numpy as np
 import scipy as sp
 from scipy.optimize import minimize
 from treelib import Node, Tree
+import dask
 
 class GeoUnit(object):
     """ This class stores the data inside each Node in the tree.
@@ -18,6 +19,11 @@ class GeoUnit(object):
         self.parent = parent
         self.attributes = attributes
         self.identifier = identifier if identifier else name
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        kwargs = [ "{}={}".format(k, v) for k, v in self.__dict__.items()]
+        return "%s(%s)" % (name, ", ".join(kwargs))
 
 
 class ToyDown(Tree):
@@ -83,14 +89,6 @@ class ToyDown(Tree):
         for child in self.children(node.identifier):
             self.add_levels_to_node(child, level+1)
 
-    def noise_children(self, node):
-        """ Adds noise to each child of `node`.
-        """
-
-        children = self.children(node.identifier)
-        for child in children:
-            self.add_laplacian_noise(child, self.eps_values[child.data.level])
-
     def adjust_children(self, node, objective_fun, node_cons, bounds, parental_equality, maxiter, verbose):
         """ Adjusts the children to add up to the parent.
         """
@@ -101,7 +99,7 @@ class ToyDown(Tree):
         noised_children = np.append([], [child.data.noised for child in children])
         unnoised_children = np.append([], [child.data.attributes for child in children])
         
-        if bounds == "non-negative" : bounds = [(0, None)]*(num_children*num_attributes)
+        bnds = [(0, None)]*(num_children*num_attributes) if bounds == "non-negative" else bounds(num_children)
 
         if parental_equality:
             cons_children = [{'type': 'eq', 'fun': lambda x: np.dot(adj_par - np.sum(x.reshape(num_children, num_attributes), axis=0),
@@ -113,7 +111,7 @@ class ToyDown(Tree):
         
         if verbose: print("Adjusting children of {}".format(node.data.name))
         adj = minimize(objective_fun(noised_children), unnoised_children, constraints=cons, 
-                       bounds=bounds, options={"maxiter": maxiter, "disp": verbose})
+                       bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
         adjusted_children = adj.x
 
         for i, adjusted_child in enumerate(np.split(adjusted_children, num_children)):
@@ -133,83 +131,138 @@ class ToyDown(Tree):
                                 for the readjustment of a Node is subject to. 
                                 Has form [{"type": "eq/ineq", "fun": lambda x: }]
                                 See scipy.optimize constraint specification for more details.
-            bounds            : (min, max) pairs for each element in x, defining the bounds on that parameter. 
-                                Use None for one of min or max when there is no bound in that direction.
+            bounds            : Function that takes the number of children, n, and returns a list of 
+                                (min, max) pairs for each attribute in each of the children, defining 
+                                the bounds on that attribute. Use None for one of min or max when there is 
+                                no bound in that direction.
                                 A value of "non-negative", flags that all counts should be > 0
             parental_equality : Boolean flag - adds constraint that for all attributes, the sum of the 
                                 children's counts should be equal to that of the parent's counts.
-            opts              : Options to pass along to scipy optimizer.  Default value None.
+            maxiter           : Option to pass along to scipy optimizer.  Defines the maximum number of
+                                iterations the optimizer should preform.  Default value 200.
+            verbose           : Boolean flag -- if True prints debug info.
         """
 
         root = self.get_node(self.root)
         num_attributes = root.data.attributes.shape[0]
         if objective_fun == "L1": objective_fun = lambda n: lambda x: sp.linalg.norm(x-n, ord=1)
+        
+        # noise tree
+        self.__noise_tree(root)
 
+        # adjust tree
         if self.parallel:
-            self.__noise_and_adjust_children_async(root, objective_fun, node_cons, bounds,
-                                                   parental_equality, maxiter, verbose)
+            adj_root = self.__adjusted_root(root, objective_fun, node_cons, bounds,
+                                            parental_equality, maxiter, verbose)
+            delay = self.__adjust_tree_async(root, adj_root, objective_fun, node_cons, bounds,
+                                            parental_equality, maxiter, verbose)
+            adjusted = delay.compute()
+            self.__update_adjusted_and_error(adjusted)
+
         else:
-            self.__noise_and_adjust_children(root, objective_fun, node_cons, bounds,
+            self.__adjust_tree(root, objective_fun, node_cons, bounds,
                                              parental_equality, maxiter, verbose)
 
-    def __noise_and_adjust_children(self, node, objective_fun, node_cons, bounds, 
+    def __noise_tree(self, node):
+        self.add_laplacian_noise(node, self.eps_values[node.data.level])
+        
+        if node.is_leaf():
+            return
+        
+        for child in self.children(node.identifier):
+            self.__noise_tree(child)
+
+    def __adjust_tree(self, node, objective_fun, node_cons, bounds, 
                                     parental_equality, maxiter, verbose):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
         """
-        
         if node.is_leaf():
             return
+
         elif node.is_root():
-            # add noise to root. No adjustment is done on the root.
-            self.add_laplacian_noise(node, self.eps_values[node.data.level])
-            
-            bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
+            # Adjust root
+            bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds(1)
             
             cons = node_cons if not node_cons else node_cons(1)
-            if verbose: print("Adjusting root node {}".format(node.data.name))
+            if verbose: print("Adjusting root node {}".format(node.identifier))
             adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
                            constraints=cons, bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
             
             node.data.adjusted = adj.x
             node.data.error = node.data.attributes - node.data.adjusted
 
-        # noise and adjust
-        self.noise_children(node)
+        # adjust children
         self.adjust_children(node, objective_fun, node_cons, bounds, parental_equality, maxiter, verbose)
 
         # recurse
         for child in self.children(node.identifier):
-            self.__noise_and_adjust_children(child, objective_fun, node_cons, 
+            self.__adjust_tree(child, objective_fun, node_cons, 
                                              bounds, parental_equality, maxiter, verbose)
 
-    def __noise_and_adjust_children_async(self, node, objective_fun, node_cons, bounds, 
-                                    parental_equality, maxiter, verbose):
+    @dask.delayed
+    def __adjust_tree_async(self, node, node_adj, objective_fun, node_cons, bounds, 
+                          parental_equality, maxiter, verbose):
         """ Recursively noises children and then "adjusts" the children to sum
             up to the population of the parent.
         """
         
         if node.is_leaf():
-            return
-        elif node.is_root():
-            # add noise to root. No adjustment is done on the root.
-            self.add_laplacian_noise(node, self.eps_values[node.data.level])
-            
-            bnds = [(0, None)]*(node.data.attributes.shape[0]) if bounds == "non-negative" else bounds
-            
-            cons = node_cons if not node_cons else node_cons(1)
-            if verbose: print("Adjusting root node {}".format(node.data.name))
-            adj = minimize(objective_fun(node.data.noised), node.data.attributes, 
-                           constraints=cons, bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
-            
-            node.data.adjusted = adj.x
-            node.data.error = node.data.attributes - node.data.adjusted
+            return {node.identifier: node_adj}
 
-        # noise and adjust
-        self.noise_children(node)
-        self.adjust_children(node, objective_fun, node_cons, bounds, parental_equality, maxiter, verbose)
+        # adjust children
+        adj_children = self.__async_adjust_children(node, node_adj, objective_fun, node_cons, bounds,
+                                                    parental_equality, maxiter, verbose)
 
         # recurse
-        for child in self.children(node.identifier):
-            self.__noise_and_adjust_children(child, objective_fun, node_cons, 
-                                             bounds, parental_equality, maxiter, verbose)
+        rs = dask.compute([self.__adjust_tree_async(self.get_node(child_id), adj_child, objective_fun, 
+                                                    node_cons, bounds, parental_equality, maxiter, verbose) 
+                           for child_id, adj_child in adj_children])[0]
+        
+        return {**{k: v for d in rs for k, v in d.items()}, **{node.identifier: node_adj}}
+
+    def __async_adjust_children(self, node, adj_par, objective_fun, node_cons, bounds, 
+                         parental_equality, maxiter, verbose):
+        """ Adjusts the children to add up to the parent.
+        """
+#         time.sleep(random.random())
+        children = self.children(node.identifier)
+        num_attributes = node.data.attributes.shape[0]
+        num_children = len(children)
+        noised_children = np.append([], [child.data.noised for child in children])
+        unnoised_children = np.append([], [child.data.attributes for child in children])
+        
+        bnds = [(0, None)]*(num_children*num_attributes) if bounds == "non-negative" else bounds(num_children)
+
+        if parental_equality:
+            cons_children = [{'type': 'eq', 'fun': lambda x: np.dot(adj_par - np.sum(x.reshape(num_children, num_attributes), axis=0),
+                                                                    adj_par - np.sum(x.reshape(num_children, num_attributes), axis=0))}]
+            if not node_cons:
+                cons = cons_children
+            else:
+                cons = node_cons(num_children) + cons_children
+        
+        if verbose: print("Adjusting children of {}".format(node.identifier))
+        adj = minimize(objective_fun(noised_children), unnoised_children, constraints=cons, 
+                       bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
+        adjusted_children = adj.x
+
+        return [(children[i].identifier, adjusted_child) 
+                for i, adjusted_child in enumerate(np.split(adjusted_children, num_children))]
+
+    def __adjusted_root(self, root, objective_fun, node_cons, bounds, 
+                        parental_equality, maxiter, verbose):
+        # Returns adjusted root
+        bnds = [(0, None)]*(root.data.attributes.shape[0]) if bounds == "non-negative" else bounds
+
+        cons = node_cons if not node_cons else node_cons(1)
+        if verbose: print("Adjusting root node {}".format(root.identifier))
+        adj = minimize(objective_fun(root.data.noised), root.data.attributes, 
+                       constraints=cons, bounds=bnds, options={"maxiter": maxiter, "disp": verbose})
+        
+        return(adj.x)
+
+    def __update_adjusted_and_error(self, adjusted_dict):
+        for n in self.all_nodes_itr():
+            n.data.adjusted = adjusted_dict[n.identifier]
+            n.data.error = n.data.attributes - n.data.adjusted
