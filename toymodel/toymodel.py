@@ -40,13 +40,15 @@ class ToyModel(Tree):
         self.eps_budget = eps_budget
 
         # create nodes and populate the tree
-        geounits = []
-        self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
-        self.populate_tree(geounits)
+#         geounits = []
+#         self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
+#         self.populate_tree(geounits)
+        self.populate_tree(hierarchy)
         self.print_unnoised_totaling_errors(self.get_node(self.root))
 
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
+      
 
     def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
         """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
@@ -104,10 +106,9 @@ class ToyModel(Tree):
         """ Adds Laplacian noise of parameter 1/`epsilon` to Node `node`. If `epsilon` is 0,
             adds no noise.
         """
-        if epsilon == 0:
-            noise = 0
-        else:
-            noise = np.random.laplace(loc=0, scale=1/epsilon)
+        assert(epsilon > 0)
+        
+        noise = np.random.laplace(loc=0, scale=1/epsilon)
 
         node.data.noised_pop = node.data.unnoised_pop + noise
         node.data.noise = noise
