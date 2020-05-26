@@ -40,10 +40,10 @@ class ToyModel(Tree):
         self.eps_budget = eps_budget
 
         # create nodes and populate the tree
-#         geounits = []
-#         self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
-#         self.populate_tree(geounits)
-        self.populate_tree(hierarchy)
+        geounits = []
+        self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
+        self.populate_tree(geounits)
+        # self.populate_tree(hierarchy)
         self.print_unnoised_totaling_errors(self.get_node(self.root))
 
         self.add_levels_to_node(self.get_node(self.root), 0)
