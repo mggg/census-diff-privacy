@@ -190,25 +190,6 @@ class ToyDown(Tree):
     
         return attribute_dict
 
-    # def adjust_tree_async(self, node, node_adj, objective_fun, node_cons, bounds, 
-    #                       parental_equality, maxiter, verbose):
-    #     """ Recursively noises children and then "adjusts" the children to sum
-    #         up to the population of the parent.
-    #     """
-        
-    #     if node.is_leaf():
-    #         return {node.identifier: node_adj}
-
-    #     # adjust children
-    #     adj_children = self.async_adjust_children(node, node_adj, objective_fun, node_cons, bounds,
-    #                                                 parental_equality, maxiter, verbose)
-
-    #     # recurse
-    #     rs = dask.compute([self.adjust_tree_async(self.get_node(child_id), adj_child, objective_fun, 
-    #                                                 node_cons, bounds, parental_equality, maxiter, verbose) 
-    #                        for child_id, adj_child in adj_children])[0]
-        
-    #     return {**{k: v for d in rs for k, v in d.items()}, **{node.identifier: node_adj}}
 
     @staticmethod
     def adjust_children(children, adj_par, objective_fun, node_cons, bounds, 
