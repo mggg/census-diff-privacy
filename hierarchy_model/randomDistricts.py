@@ -38,7 +38,7 @@ class Hierarchy_2D:
         nodes = self.gdf[[self.leaf_id] + self.attributes]
 
         for i, offset in enumerate(np.cumsum(parental_offsets)[:-1]):
-            level_names = leafs.geoid.apply(lambda s: s[:-offset])
+            level_names = leafs[self.leaf_id].apply(lambda s: s[:-offset])
             nodes = nodes.append(leafs.groupby(level_names).sum().reset_index(), ignore_index=True)
         
         node_dict = nodes.set_index(self.leaf_id).to_dict(orient="index")
@@ -69,6 +69,7 @@ class Hierarchy_2D:
         """
         pop_targets = [self.total_pop/num_districts]
         d  = self.grow_districts(self.graph, self.pop_col, pop_targets, self.total_pop, epsilon)
+        # print(pop_targets, d)
 
         ps = []
         for i in d:
@@ -79,8 +80,9 @@ class Hierarchy_2D:
                 ps.append(Partition(self.graph, {x:int(x in d[i]) for x in self.graph.nodes},
                                 updaters={"cut_edges": cut_edges, "population": Tally(self.pop_col)}))
 
+        # print(ps)
         part = ps[0]
-        mapping = {self.graph.nodes[x]['geoid']:int(x in d[0]) for x in self.graph.nodes}
+        mapping = {self.graph.nodes[x][self.leaf_id]:int(x in d[0]) for x in self.graph.nodes}
         
         return (part, mapping)
 
@@ -105,16 +107,19 @@ class Hierarchy_2D:
         pop = graph.nodes[start][pop_col]
 
         while target_index < len(pop_targets)-1:
+            # print(district_list)
             add_node = np.random.choice(list(frontier))
             pop += sum([graph.nodes[n][pop_col] for n in set(graph.neighbors(add_node))-set(district_list)])
             frontier = frontier.union(set(graph.neighbors(add_node))-set(district_list))
             frontier = frontier - set([add_node])
             district_list.extend(set(graph.neighbors(add_node)) - set(district_list))
             while pop_targets[target_index]*(1-epsilon) < pop:
+                # print(district_list, frontier, pop_targets)
                 #over current population target
                 if pop_targets[target_index]*(1+epsilon) > pop:
                     districts[target_index] = district_list.copy()
                 target_index += 1
+        # print(districts)
         pop_targets.pop()
         return districts
 
