@@ -179,7 +179,6 @@ class ToyDown(Tree):
 
         # recurse
         attribute_dict = {node_id: node_adj}
-        child_futures = []
         
         for child_id, adj_child in adj_children:
             adjusted_child =  ToyDown.__adjust_tree(treelib.Tree(model).subtree(child_id), 
