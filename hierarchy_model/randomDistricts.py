@@ -22,6 +22,7 @@ class Hierarchy_2D:
         self.leaf_id = geoid_col
         self.pop_col = pop_col
         self.total_pop = self.gdf[self.pop_col].sum()
+        self.levels = len(parental_offsets)
 
         self.attributes = attribute_cols
         # self.parental_offsets = parental_offsets
@@ -86,9 +87,17 @@ class Hierarchy_2D:
         
         return (part, mapping)
 
-    def assign_district_tree_varriance(self, district):
+    def assign_district_tree_varriance(self, district, eps=None, eps_splits=None):
         self.tree.assign_district_to_leaves(district)
-        return self.tree.district_varriance(self.tree.get_node(self.tree.root))
+        root = self.tree.get_node(self.tree.root)
+        self.tree.assign_weights(root)
+        
+        epsilons = np.ones(self.levels)*np.sqrt(2) if eps_splits == None else np.array(eps_splits)
+        if eps != None:
+            epsilons *= eps if eps_splits else eps*(1/np.sqrt(2))*(1/self.levels)
+            
+        # print(epsilons)
+        return self.tree.district_variance(root, epsilons)
 
     @staticmethod
     def grow_districts(graph, pop_col, pop_targets, total_pop, epsilon):
@@ -178,17 +187,32 @@ class Hierarchy_2D:
             for leaf, weight in district.items():
                 self.get_node(leaf).data.weight = weight
 
-        def district_varriance(self, node):
+        def assign_weights(self, node):
+            if not node.is_leaf():
+                children = self.children(node.identifier)
+                child_weights = [self.assign_weights(child) for child in children]
+                node.data.weight = np.mean(child_weights)
+            return node.data.weight
+
+
+        def district_variance(self, node, epsilons):
+            eps_k = epsilons[0]
             if node.is_leaf():
-                return 0
+                child_vars = []
+            else:
+                children = self.children(node.identifier)
+                child_vars = [self.district_variance(child, epsilons[1:]) for child in children]
+                # child_weights = [child.data.weight for child in children]
+                # node.data.weight = np.mean(child_weights)
 
-            children = self.children(node.identifier)
-            child_vars = [self.district_varriance(child) for child in children]
-            child_weights = [child.data.weight for child in children]
+            if node.data.parent == None: 
+                return node.data.weight**2 * (2/(eps_k**2)) + sum(child_vars)
+            else:
+                par_weight = self.get_node(node.data.parent).data.weight
+                return (node.data.weight - par_weight)**2 *(2/(eps_k**2)) + sum(child_vars)
 
-            node.data.weight = np.mean(child_weights)
-
-            return sum([(node.data.weight - child_weight)**2 for child_weight in child_weights]) + sum(child_vars)
+            # print((1/(eps_k**2)))
+            # return sum([(node.data.weight - child_weight)**2 for child_weight in child_weights])*(2/(eps_k**2)) + sum(child_vars)
 
 
 
