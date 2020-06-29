@@ -25,7 +25,6 @@ class Hierarchy_2D:
         self.levels = len(parental_offsets)
 
         self.attributes = attribute_cols
-        # self.parental_offsets = parental_offsets
         self.tree = self.Hierarchy_Tree(self.create_tree_geounits_from_leaves(parental_offsets))
 
 
@@ -81,13 +80,12 @@ class Hierarchy_2D:
                 ps.append(Partition(self.graph, {x:int(x in d[i]) for x in self.graph.nodes},
                                 updaters={"cut_edges": cut_edges, "population": Tally(self.pop_col)}))
 
-        # print(ps)
         part = ps[0]
         mapping = {self.graph.nodes[x][self.leaf_id]:int(x in d[0]) for x in self.graph.nodes}
         
         return (part, mapping)
 
-    def assign_district_tree_varriance(self, district, eps=None, eps_splits=None):
+    def assign_district_tree_variance(self, district, eps=None, eps_splits=None):
         self.tree.assign_district_to_leaves(district)
         root = self.tree.get_node(self.tree.root)
         self.tree.assign_weights(root)
@@ -96,7 +94,6 @@ class Hierarchy_2D:
         if eps != None:
             epsilons *= eps if eps_splits else eps*(1/np.sqrt(2))*(1/self.levels)
             
-        # print(epsilons)
         return self.tree.district_variance(root, epsilons)
 
     @staticmethod
@@ -116,19 +113,16 @@ class Hierarchy_2D:
         pop = graph.nodes[start][pop_col]
 
         while target_index < len(pop_targets)-1:
-            # print(district_list)
             add_node = np.random.choice(list(frontier))
             pop += sum([graph.nodes[n][pop_col] for n in set(graph.neighbors(add_node))-set(district_list)])
             frontier = frontier.union(set(graph.neighbors(add_node))-set(district_list))
             frontier = frontier - set([add_node])
             district_list.extend(set(graph.neighbors(add_node)) - set(district_list))
             while pop_targets[target_index]*(1-epsilon) < pop:
-                # print(district_list, frontier, pop_targets)
                 #over current population target
                 if pop_targets[target_index]*(1+epsilon) > pop:
                     districts[target_index] = district_list.copy()
                 target_index += 1
-        # print(districts)
         pop_targets.pop()
         return districts
 
@@ -202,17 +196,12 @@ class Hierarchy_2D:
             else:
                 children = self.children(node.identifier)
                 child_vars = [self.district_variance(child, epsilons[1:]) for child in children]
-                # child_weights = [child.data.weight for child in children]
-                # node.data.weight = np.mean(child_weights)
 
             if node.data.parent == None: 
                 return node.data.weight**2 * (2/(eps_k**2)) + sum(child_vars)
             else:
                 par_weight = self.get_node(node.data.parent).data.weight
                 return (node.data.weight - par_weight)**2 *(2/(eps_k**2)) + sum(child_vars)
-
-            # print((1/(eps_k**2)))
-            # return sum([(node.data.weight - child_weight)**2 for child_weight in child_weights])*(2/(eps_k**2)) + sum(child_vars)
 
 
 
