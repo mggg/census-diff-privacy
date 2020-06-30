@@ -7,12 +7,6 @@ import matplotlib.pyplot as plt
 pd.set_option('display.max_columns', None)
 from scipy import stats
 
-# This is the synthetic vote percent by district for candidate X that we generated.
-percent_votes_for_X = np.array([0.15645235, 0.20648465, 0.23917829, 0.44568536,
-                                0.51541049, 0.68753399, 0.73400675, 0.82867988,
-                                0.89909448])
-
-
 def read_df_1940(person_file):
     """ Reads the data from the `person_file`. The columns were gathered from the Person line in
         the Census 1940s MDF writer here:
@@ -100,112 +94,166 @@ def collect_run_percents_by_race(dir_name, state_id, race):
     return main_df
 
 def plot_simulated_data(runs_df, num_runs, axs, plt_coords):
-    """
+    """ Plot all the points using the runs in `runs_df` as x coordinates.
+        Args:
+            runs_df (Pandas DataFrame): df containing the runs, each run is a
+                                        seperate column labeled for eg. "Run_1"
+            num_runs: (int) Number of Runs in `runs_df`
+            axs: (MatplotLib Axes object)
+            plt_coords: (tuple) postion the graph is to be positioned in `axes`
     """
     ms = np.array([])
-    r_squareds = np.array([])
     rgba = (0.9375,0.5,0.5,.5)
+    _, percent_votes_for_X = get_original_data()
 
-    # plot all the points
     for i in range(1, num_runs+1):
         # plot the points in the run
-        percents_by_race = np.array(sorted(runs_df["Run_{}".format(i)]))
-        axs[plt_coords[0], plt_coords[1]].scatter(percents_by_race, percent_votes_for_X, c=[rgba,])
+        percents_by_race = np.array(runs_df["Run_{}".format(i)])
+        axs[plt_coords[0], plt_coords[1]].scatter(percents_by_race,
+                                                  percent_votes_for_X,
+                                                  c=[rgba,])
 
-        # fit a linear line and plot it
-        slope, intercept, r_value, p_value, std_err = stats.linregress(percents_by_race, percent_votes_for_X)
-
-        # collect the slope and r_squared value
+        slope, intercept, _, _, _ = stats.linregress(percents_by_race, percent_votes_for_X)
         ms = np.append(ms, slope)
-        r_squareds = np.append(r_squareds, r_value**2)
 
         if i == num_runs:
+            # hacky: label the last line
             mean = "{0:.3g}".format(np.mean(ms))
-            r_2 = "{0:.3g}".format(np.mean(r_squareds))
+            var = "{0:.3g}".format(np.var(ms))
+
             axs[plt_coords[0], plt_coords[1]].plot(percents_by_race,
                                                    intercept + slope*percents_by_race,
                                                    c=rgba,
-                                                   label="E(m): {mean}, E(R^2): {r_2}".format(mean=mean,
-                                                                                              r_2=r_2))
+                                                   label="E(m): {mean}, Var(m): {var}".format(mean=mean,
+                                                                                              var=var))
         else:
-            axs[plt_coords[0], plt_coords[1]].plot(percents_by_race, intercept + slope*percents_by_race, c=rgba)
+            axs[plt_coords[0], plt_coords[1]].plot(percents_by_race,
+                                                   intercept + slope*percents_by_race,
+                                                   c=rgba)
 
-def plot_original_data(axs, plt_coords):
-    """
-    """
+def get_original_data():
+    """ This is the original data fabricated by JN which was noised by TopDown
+        in the runs.
 
-    # plot the original line
+        Returns:
+            race_percents (numpy arr): Percent of people of race A in each district
+            percent_votes_for_X: (numpy arr): Percent of votes obtained by
+                                              candidate X in each district
+    """
     race_a = [60, 101, 102, 112, 100, 116, 120, 161, 138]
     tot_pops = [345, 366, 260, 289, 294, 279, 200, 211, 151]
-    zipped = zip(race_a, tot_pops)
-    race_percents = [float(race_a)/tot_pops for (race_a,tot_pops) in zipped]
+    race_percents = np.array([float(race_a)/tot_pops for (race_a,tot_pops) in zip(race_a, tot_pops)])
 
-    xs = np.array(sorted(race_percents))
-    axs[plt_coords[0], plt_coords[1]].scatter(xs, percent_votes_for_X, c=[(0,0,1,1),],zorder=10)
+    # This is the synthetic vote percent by district for candidate X that we generated.
+    percent_votes_for_X = np.array([0.15645235, 0.20648465, 0.23917829, 0.44568536,
+                                    0.51541049, 0.68753399, 0.73400675, 0.82867988,
+                                    0.89909448])
 
-    # fit a linear line and plot it
-    slope, intercept, r_value, p_value, std_err = stats.linregress(xs, percent_votes_for_X)
-    xs = np.insert(xs, 0,0)
-    xs = np.append(xs, 1)
+    return race_percents, percent_votes_for_X
+
+def plot_original_data(axs, plt_coords):
+    """ Plot the ER line for the unnoised, fabricated 9 point dataset.
+
+        Args:
+            axs: (MatplotLib Axes object)
+            plt_coords: (tuple) postion the graph is to be positioned in `axes`
+    """
+    race_percents, percent_votes_for_X = get_original_data()
+
+    # plot the points
+    axs[plt_coords[0], plt_coords[1]].scatter(race_percents,
+                                              percent_votes_for_X,
+                                              c=[(0,0,1,1),],
+                                              zorder=10)
+
+    # plot the best fit line
+    slope, intercept, _, _, _ = stats.linregress(race_percents,
+                                                 percent_votes_for_X)
+
+    race_percents = np.insert(race_percents, 0,0)
+    race_percents = np.append(race_percents, 1)
     mean = "{0:.3g}".format(slope)
-    r_2 = "{0:.3g}".format(r_value**2)
 
-    axs[plt_coords[0], plt_coords[1]].plot(xs,
-                                           intercept + slope*xs,
+    axs[plt_coords[0], plt_coords[1]].plot(race_percents,
+                                           intercept + race_percents*slope,
                                            c=(0,0,1,1),
-                                           label="m: {mean}, R^2:{r_2}".format(mean=mean, r_2=r_2)
+                                           label="m: {mean}".format(mean=mean)
                                            ,zorder=10)
 
 def plot_original_data_hist(axs, plt_coords):
+    """ Plot a vertical line for the unnoised, fabricated 9 point dataset in the
+        histogram at  coordinates `plt_coords` of `axs`.
+
+        Args:
+            axs: (MatplotLib Axes object)
+            plt_coords: (tuple) postion the graph is to be positioned in `axs`
     """
-    """
-    # plot the original line
-    race_a = [60, 101, 102, 112, 100, 116, 120, 161, 138]
-    tot_pops = [345, 366, 260, 289, 294, 279, 200, 211, 151]
-    zipped = zip(race_a, tot_pops)
-    race_percents = [float(race_a)/tot_pops for (race_a,tot_pops) in zipped]
-
-    xs = np.array(sorted(race_percents))
-
-    # fit a linear line and plot it
-    slope, intercept, r_value, p_value, std_err = stats.linregress(xs, percent_votes_for_X)
-
+    race_percents, percent_votes_for_X = get_original_data()
+    race_percents = np.array(race_percents)
+    slope, _, _, _, _ = stats.linregress(race_percents, percent_votes_for_X)
     axs[plt_coords[0], plt_coords[1]].axvline(x=slope, color="b", zorder=10)
 
 def plot_simulated_data_hist(runs_df, num_runs, axs, plt_coords):
-    """
+    """ Plot a histogram for the TopDown data at coordinates `plt_coords` of `axs`.
+
+        Args:
+            axs: (MatplotLib Axes object)
+            plt_coords: (tuple) postion the graph is to be positioned in `axs`
     """
     ms = np.array([])
-    r_squareds = np.array([])
+    _, percent_votes_for_X = get_original_data()
 
-    # plot all the points
+    # collect the slopes
     for i in range(1, num_runs+1):
-        # plot the points in the run
-        percents_by_race = np.array(sorted(runs_df["Run_{}".format(i)]))
-
-        # fit a linear line and plot it
-        slope, intercept, r_value, p_value, std_err = stats.linregress(percents_by_race, percent_votes_for_X)
-
-        # collect the slope and r_squared value
+        percents_by_race = np.array(runs_df["Run_{}".format(i)])
+        slope, _, _, _, _ = stats.linregress(percents_by_race, percent_votes_for_X)
         ms = np.append(ms, slope)
 
     axs[plt_coords[0], plt_coords[1]].hist(ms, color="lightcoral", bins=np.linspace(-0.5, 1.2, 35))
 
-def plot(runs_df, num_runs, axs, plt_coords, hist=False):
+def plot_histograms(axs, plt_coords, runs_df, num_runs):
+    """ Generates a histogram of the ensemble of TopDown noised runs and labels
+        the original data on it.
+
+        Args:
+            axs: (MatplotLib Axes object)
+            plt_coords: (tuple) postion the graph is to be positioned in `axs`
+            runs_df (Pandas DataFrame): df containing the runs, each run is a
+                                        seperate column labeled for eg. "Run_1"
+            num_runs: (int) Number of Runs in `runs_df`
     """
+    plot_original_data_hist(axs, plt_coords)
+    plot_simulated_data_hist(runs_df, num_runs, axs, plt_coords)
+
+    axs[plt_coords[0], plt_coords[1]].set_xlabel("Slope of ER line")
+    axs[plt_coords[0], plt_coords[1]].set_ylabel("Frequency")
+    axs[plt_coords[0], plt_coords[1]].set_xlim(0.2, 1.6)
+    axs[plt_coords[0], plt_coords[1]].set_ylim(0, 50)
+
+def plot_er(axs, plt_coords, runs_df, num_runs):
+    """ Generates ER lines of the ensemble of TopDown noised runs and labels
+        the original data on it.
+
+        Args:
+            axs: (MatplotLib Axes object)
+            plt_coords: (tuple) postion the graph is to be positioned in `axs`
+            runs_df (Pandas DataFrame): df containing the runs, each run is a
+                                        seperate column labeled for eg. "Run_1"
+            num_runs: (int) Number of Runs in `runs_df`
+    """
+    plot_simulated_data(runs_df, num_runs, axs, plt_coords)
+    plot_original_data(axs, plt_coords)
+    axs[plt_coords[0], plt_coords[1]].set_xlabel("Percent A")
+    axs[plt_coords[0], plt_coords[1]].set_ylabel("Percent vote for X")
+    axs[plt_coords[0], plt_coords[1]].hlines([0, 1], 0, 1, linestyles='dashed')
+    axs[plt_coords[0], plt_coords[1]].legend()
+
+def plot(runs_df, num_runs, axs, plt_coords, hist=False):
+    """ General function that plots the data in `runs_df` in the
+        `plt_coords` position of `axes`.
+        Plots ecological regression plots by default.
     """
     if hist:
-        plot_original_data_hist(axs, plt_coords)
-        plot_simulated_data_hist(runs_df, num_runs, axs, plt_coords)
-
-        axs[plt_coords[0], plt_coords[1]].set_xlabel("Slope of ER line")
-        axs[plt_coords[0], plt_coords[1]].set_ylabel("Frequency")
-        axs[plt_coords[0], plt_coords[1]].set_xlim(0.2, 1.6)
-        axs[plt_coords[0], plt_coords[1]].set_ylim(0, 50)
+        plot_histograms(axs, plt_coords, runs_df, num_runs)
     else:
-        plot_simulated_data(runs_df, num_runs, axs, plt_coords)
-        plot_original_data(axs, plt_coords)
-        axs[plt_coords[0], plt_coords[1]].set_xlabel("Percent A")
-        axs[plt_coords[0], plt_coords[1]].set_ylabel("Percent vote for X")
-        axs[plt_coords[0], plt_coords[1]].hlines([0, 1], 0, 1, linestyles='dashed')
-        axs[plt_coords[0], plt_coords[1]].legend()
+        plot_er(axs, plt_coords, runs_df, num_runs)
