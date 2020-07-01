@@ -41,40 +41,57 @@ def race_percents_by_district(df, state_id, race):
                                                     ignore_index=True)
     return pop_percent_df
 
-def rename_county_and_enumdist_to_input_names(df):
+def rename_county_and_enumdist_to_input_names(df, county_dists):
     """ Renamed the outputs to match the names of the inputs. This convolution is because I picked up the
         Person lines for the experiments straight from the 1940s ipums file and thus had to map those county
         ids to the ones we have in our synthetic data.
     """
-    df.loc[df["County"] == 10, "County"] = 11
-    df.loc[df["County"] == 30, "County"] = 12
-    df.loc[df["County"] == 50, "County"] = 13
+    # county_dists = dict({10: [11, 12, 20],
+    #                      30: [30, 40, 50],
+    #                      50: [20, 30, 40]})
 
-    df.loc[(df["County"] == 11) & (df["Enumdist"] == 11), "Enumdist"] = 111
-    df.loc[(df["County"] == 11) & (df["Enumdist"] == 12), "Enumdist"] = 112
-    df.loc[(df["County"] == 11) & (df["Enumdist"] == 20), "Enumdist"] = 113
+    # change the county names first
+    county_mapping = dict()
+    county_translation = 10
+    for county in sorted(county_dists.keys()):
+        county_translation += 1
+        county_mapping[county_translation] = county
+        df.loc[df["County"] == county, "County"] = county_translation
+        # df.loc[df["County"] == 30, "County"] = 12
+        # df.loc[df["County"] == 50, "County"] = 13
 
-    df.loc[(df["County"] == 12) & (df["Enumdist"] == 10), "Enumdist"] = 121
-    df.loc[(df["County"] == 12) & (df["Enumdist"] == 20), "Enumdist"] = 122
-    df.loc[(df["County"] == 12) & (df["Enumdist"] == 30), "Enumdist"] = 123
 
-    df.loc[(df["County"] == 13) & (df["Enumdist"] == 10), "Enumdist"] = 131
-    df.loc[(df["County"] == 13) & (df["Enumdist"] == 20), "Enumdist"] = 132
-    df.loc[(df["County"] == 13) & (df["Enumdist"] == 30), "Enumdist"] = 133
+    for county in [11, 12, 13]:
+        dist_counter = 0
+        for dist in sorted(county_dists[county_mapping[county]]):
+            dist_counter += 1
+            df.loc[(df["County"] == county) & (df["Enumdist"] == dist), "Enumdist"] = county * 10 + dist_counter
+    #
+    # df.loc[(df["County"] == 11) & (df["Enumdist"] == 11), "Enumdist"] = 111
+    # df.loc[(df["County"] == 11) & (df["Enumdist"] == 12), "Enumdist"] = 112
+    # df.loc[(df["County"] == 11) & (df["Enumdist"] == 20), "Enumdist"] = 113
+    #
+    # df.loc[(df["County"] == 12) & (df["Enumdist"] == 10), "Enumdist"] = 121
+    # df.loc[(df["County"] == 12) & (df["Enumdist"] == 20), "Enumdist"] = 122
+    # df.loc[(df["County"] == 12) & (df["Enumdist"] == 30), "Enumdist"] = 123
+    #
+    # df.loc[(df["County"] == 13) & (df["Enumdist"] == 10), "Enumdist"] = 131
+    # df.loc[(df["County"] == 13) & (df["Enumdist"] == 20), "Enumdist"] = 132
+    # df.loc[(df["County"] == 13) & (df["Enumdist"] == 30), "Enumdist"] = 133
 
     df = df.sort_values(["County", "Enumdist"])
     df.reset_index(drop=True)
     return df
 
-def pop_percents_by_race(person_file, state_id, race):
+def pop_percents_by_race(person_file, state_id, race, county_dists):
     """ Read and return the % of people of race `race` in person_file
     """
     df = read_df_1940(person_file)
     percents_by_race_df = race_percents_by_district(df, state_id, race)
-    renamed_df = rename_county_and_enumdist_to_input_names(percents_by_race_df)
+    renamed_df = rename_county_and_enumdist_to_input_names(percents_by_race_df, county_dists)
     return renamed_df
 
-def collect_run_percents_by_race(dir_name, state_id, race):
+def collect_run_percents_by_race(dir_name, state_id, race, county_dists):
     """ Generates a dataframe of the % of people of race `race` by district
         for all the runs in an experiment.
     """
@@ -87,7 +104,7 @@ def collect_run_percents_by_race(dir_name, state_id, race):
                 person_file = path + "/MDF_PER_CLEAN.dat"
                 run += 1
 
-                percents_by_race_df = pop_percents_by_race(person_file, state_id, race)
+                percents_by_race_df = pop_percents_by_race(person_file, state_id, race, county_dists)
                 percents_by_race_df = percents_by_race_df.rename(columns={"Run": "Run_{}".format(run)})
 
                 main_df = pd.merge(main_df, percents_by_race_df, how="outer", on=["State", "County", "Enumdist"])
@@ -228,7 +245,7 @@ def plot_histograms(axs, plt_coords, runs_df, num_runs):
     axs[plt_coords[0], plt_coords[1]].set_xlabel("Slope of ER line")
     axs[plt_coords[0], plt_coords[1]].set_ylabel("Frequency")
     axs[plt_coords[0], plt_coords[1]].set_xlim(0.2, 1.6)
-    axs[plt_coords[0], plt_coords[1]].set_ylim(0, 50)
+    axs[plt_coords[0], plt_coords[1]].set_ylim(0, 70)
 
 def plot_er(axs, plt_coords, runs_df, num_runs):
     """ Generates ER lines of the ensemble of TopDown noised runs and labels
