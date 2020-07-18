@@ -46,9 +46,6 @@ def rename_county_and_enumdist_to_input_names(df, county_dists):
         Person lines for the experiments straight from the 1940s ipums file and thus had to map those county
         ids to the ones we have in our synthetic data.
     """
-    # county_dists = dict({10: [11, 12, 20],
-    #                      30: [30, 40, 50],
-    #                      50: [20, 30, 40]})
 
     # change the county names first
     county_mapping = dict()
@@ -57,27 +54,12 @@ def rename_county_and_enumdist_to_input_names(df, county_dists):
         county_translation += 1
         county_mapping[county_translation] = county
         df.loc[df["County"] == county, "County"] = county_translation
-        # df.loc[df["County"] == 30, "County"] = 12
-        # df.loc[df["County"] == 50, "County"] = 13
-
 
     for county in [11, 12, 13]:
         dist_counter = 0
         for dist in sorted(county_dists[county_mapping[county]]):
             dist_counter += 1
             df.loc[(df["County"] == county) & (df["Enumdist"] == dist), "Enumdist"] = county * 10 + dist_counter
-    #
-    # df.loc[(df["County"] == 11) & (df["Enumdist"] == 11), "Enumdist"] = 111
-    # df.loc[(df["County"] == 11) & (df["Enumdist"] == 12), "Enumdist"] = 112
-    # df.loc[(df["County"] == 11) & (df["Enumdist"] == 20), "Enumdist"] = 113
-    #
-    # df.loc[(df["County"] == 12) & (df["Enumdist"] == 10), "Enumdist"] = 121
-    # df.loc[(df["County"] == 12) & (df["Enumdist"] == 20), "Enumdist"] = 122
-    # df.loc[(df["County"] == 12) & (df["Enumdist"] == 30), "Enumdist"] = 123
-    #
-    # df.loc[(df["County"] == 13) & (df["Enumdist"] == 10), "Enumdist"] = 131
-    # df.loc[(df["County"] == 13) & (df["Enumdist"] == 20), "Enumdist"] = 132
-    # df.loc[(df["County"] == 13) & (df["Enumdist"] == 30), "Enumdist"] = 133
 
     df = df.sort_values(["County", "Enumdist"])
     df.reset_index(drop=True)
