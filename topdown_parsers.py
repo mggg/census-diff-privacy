@@ -19,10 +19,6 @@ def read_df_1940(person_file):
     df.columns = columns
     return df
 
-def read_ipums_df_1940(filename):
-    """
-    """
-
 def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False):
     """ Generates and returns a DataFrame that tabulates "values" by enumdist
         for a single run.
