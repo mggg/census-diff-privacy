@@ -19,10 +19,6 @@ def read_df_1940(person_file):
     df.columns = columns
     return df
 
-def read_ipums_df_1940(filename):
-    """
-    """
-
 def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False):
     """ Generates and returns a DataFrame that tabulates "values" by enumdist
         for a single run.
@@ -90,4 +86,50 @@ def collect_by_enumdist(dir_name,
                                    values_df,
                                    how="outer",
                                    on=["State", "County", "Enumdist"])
+    return main_df
+
+def pops_by_enumdist(input_file, state_fips_code):
+    """ Returns the population in each enumdist of the state `state_fips_code`.
+        `input_file` is the filepath of the .dat file used as an input to TopDown.
+
+        Returns a Dict of the form {
+            (county_1, enumdist_1) : pop_1,
+            (county_1, enumdist_2) : pop_2,
+                   ...
+            (county_n, enumdist_x) : pop_k,
+        }
+    """
+    enumdist_pops = dict()
+
+    with open(input_file, "r") as raw_file:
+        for line in raw_file:
+            if line[0] == 'H' and line[53:55] == state_fips_code:
+                # we have a household from this state!
+                pop = int(line[15:17]) # pop of household
+                county = int(line[55:59])
+                enumdist = int(line[124:128])
+
+                # add pop
+                if (county, enumdist) in enumdist_pops.keys():
+                    enumdist_pops[(county, enumdist)] += pop
+                else:
+                    enumdist_pops[(county, enumdist)] = pop
+
+    return enumdist_pops
+
+def pop_of_state_by_enumdist(input_file, state_fips_code):
+    """ Returns a DataFrame with the populations of each enumdist in the state `state_fips_code`.
+        `input_file` is the filepath of the .dat file used as input to TopDown.
+    """
+    enumdist_pops = pops_by_enumdist(input_file, state_fips_code)
+
+    # populate a DataFrame with the enumdist populations
+    main_df = pd.DataFrame(columns=["State", "County", "Enumdist", "TOTPOP"])
+
+    for (county, enumdist) in enumdist_pops.keys():
+        main_df = main_df.append({"State": int(state_fips_code),
+                                  "County": county,
+                                  "Enumdist": enumdist,
+                                  "TOTPOP": enumdist_pops[(county, enumdist)]},
+                                 ignore_index=True)
     return main_df
