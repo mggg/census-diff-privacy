@@ -19,6 +19,10 @@ def read_df_1940(person_file):
     df.columns = columns
     return df
 
+def read_ipums_df_1940(filename):
+    """
+    """
+
 def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False):
     """ Generates and returns a DataFrame that tabulates "values" by enumdist
         for a single run.
@@ -30,28 +34,21 @@ def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False):
         returned.
     """
     state = df[df["TABBLKST"] == state_id]
-    values_df = pd.DataFrame(columns=["State", "County", "Enumdist"])
 
-    for county in state["TABBLKCOU"].unique():
-        enum_dists = state[state["TABBLKCOU"] == county]["ENUMDIST"].unique()
-        for enum_dist in enum_dists:
-            dist_df = state[(state["TABBLKCOU"] == county) & (state["ENUMDIST"] == enum_dist)]
-            tot_pop = len(dist_df.index)
+    if race and race_percent:
+        tot_pops = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
+        tot_pops.columns = ["TABBLKST", "TABBLKCOU", "ENUMDIST", "Run"]
 
-            if race and race_percent:
-                race_pop = len(dist_df[dist_df["CENRACE"] == race].index)
-                value = float(race_pop)/tot_pop
-            elif race:
-                race_pop = len(dist_df[dist_df["CENRACE"] == race].index)
-                value = race_pop
-            else:
-                value = tot_pop
+        state['race_match'] = state.CENRACE == race
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['race_match'].agg([('Run', 'sum')]).reset_index()
+        values_df["Run"]  = values_df["Run"] / tot_pops["Run"]
+    elif race:
+        state['race_match'] = state.CENRACE == race
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['race_match'].agg([('Run', 'sum')]).reset_index()
+    else:
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
 
-            values_df = values_df.append({"State":state_id,
-                                          "County":county,
-                                          "Enumdist":enum_dist,
-                                          "Run": value},
-                                          ignore_index=True)
+    values_df.columns = ["State", "County", "Enumdist", "Run"]
     return values_df
 
 def collect_by_enumdist(dir_name,
