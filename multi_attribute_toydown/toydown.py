@@ -119,11 +119,13 @@ class ToyDown(Tree):
                                 for the readjustment of a Node is subject to. 
                                 Has form [{"type": "eq/ineq", "fun": lambda x: }]
                                 See scipy.optimize constraint specification for more details.
-            bounds            : Function that takes the number of children, n, and returns a list of 
+            bounds            : If using scipy.optimzize - Function that takes the number of children, n, and returns a list of 
                                 (min, max) pairs for each attribute in each of the children, defining 
                                 the bounds on that attribute. Use None for one of min or max when there is 
                                 no bound in that direction.
                                 A value of "non-negative", flags that all counts should be > 0
+                                If using gurobi, a value of None, imposes no bounds on the count values.
+                                and any other value, flags that all counts should be > 0
             parental_equality : Boolean flag - adds constraint that for all attributes, the sum of the 
                                 children's counts should be equal to that of the parent's counts.
             maxiter           : Option to pass along to scipy optimizer.  Defines the maximum number of
@@ -137,7 +139,7 @@ class ToyDown(Tree):
         self.noise_tree(root)
 
         if self.gurobi:
-            adj_root = self.adjusted_root_gp(root, None, None, verbose, self.pop_vap)
+            adj_root = self.adjusted_root_gp(root, None, None, bounds, verbose, self.pop_vap)
         else:
             if objective_fun == "L1": objective_fun = lambda n: lambda x: sp.linalg.norm(x-n, ord=1)
             if objective_fun == "L2": objective_fun = lambda n: lambda x: sp.linalg.norm(x-n, ord=2)
@@ -170,7 +172,7 @@ class ToyDown(Tree):
 
         # adjust children
         if gurobi:
-             adj_children = ToyDown.adjust_children_gp(model.children(node_id), node_adj, 
+             adj_children = ToyDown.adjust_children_gp(model.children(node_id), node_adj, bounds,
                                                             parental_equality, verbose, pop_vap)
         else:
             adj_children = ToyDown.adjust_children(model.children(node_id), node_adj, objective_fun, 
@@ -233,7 +235,7 @@ class ToyDown(Tree):
 
 
     @staticmethod
-    def adjusted_root_gp(root, objective_fun, node_cons, verbose, pop_vap):
+    def adjusted_root_gp(root, objective_fun, node_cons, bounds, verbose, pop_vap):
         # Returns adjusted root
         m = gp.Model("root")
         if not verbose: m.params.OutputFlag = 0
@@ -251,7 +253,11 @@ class ToyDown(Tree):
         num_cols = root_noised.shape[1]
         num_rows = root_noised.shape[0]
 
-        x = m.addVars(num_rows, num_cols,vtype=GRB.CONTINUOUS, name="Counts")
+        if bounds:
+            x = m.addVars(num_rows, num_cols, vtype=GRB.CONTINUOUS, name="Counts")
+        else:
+            x = m.addVars(num_rows, num_cols, lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                          vtype=GRB.CONTINUOUS, name="Counts")
         
         exps = []
         for i in range(num_rows):
@@ -274,7 +280,7 @@ class ToyDown(Tree):
         return {ks[i]: adj_root_atts[i] for i in range(num_rows)}
 
     @staticmethod
-    def adjust_children_gp(children, adj_par, parental_equality, verbose, pop_vap):
+    def adjust_children_gp(children, adj_par, bounds, parental_equality, verbose, pop_vap):
         """By default uses the least squares (L2 norm) as the objective function.  And node_cons
            are that node_atributes[0] == sum(node_atributes[1:]) """
         
@@ -302,7 +308,11 @@ class ToyDown(Tree):
 
         m = gp.Model("children")
         if not verbose: m.params.OutputFlag = 0
-        xs = m.addVars(num_children, num_rows, num_cols,vtype=GRB.CONTINUOUS, name="Counts")
+        if bounds:
+            xs = m.addVars(num_children, num_rows, num_cols,vtype=GRB.CONTINUOUS, name="Counts")
+        else:
+            xs = m.addVars(num_children, num_rows, num_cols, lb=-GRB.INFINITY, ub=GRB.INFINITY, 
+                           vtype=GRB.CONTINUOUS, name="Counts")
         
         exps = []
         for c in range(num_children):
