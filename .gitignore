@@ -1,3 +1,5 @@
 .ipynb_checkpoints/
 __pycache__
 toymodel/__pycache__
+*.DS_Store
+*.dat 
