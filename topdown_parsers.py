@@ -133,3 +133,788 @@ def pop_of_state_by_enumdist(input_file, state_fips_code):
                                   "TOTPOP": enumdist_pops[(county, enumdist)]},
                                  ignore_index=True)
     return main_df
+
+def distribution_of_input_var(input_file, line_type,
+                              single_idx=None, start_idx=None, end_idx=None):
+    """ Returns all the values at columns `single_idx` or (`start_idx, `end_idx`)
+        of each line of `line_type` of `input_file` as a list.
+        `line_type` denotes whether the line is a Person line or a Household Line.
+
+        The indexes should be entered **as is** as appears on the count codebook here:
+        https://usa.ipums.org/usa/resources/1940CensusDASTestData/EXT1940USCB.cbk
+
+        Example Usage:
+            distribution_of_input_var(file, "H", single_idx=17)
+            distribution_of_input_var(file, "H", start_idx=2, end_idx=5)
+    """
+    # verify inputs
+    assert(line_type in ["P", "H"])
+    assert(single_idx != 0)
+    if single_idx:
+        assert(start_idx == None and end_idx==None)
+    else:
+        assert(start_idx)
+        assert(end_idx)
+
+    all_vars = []
+    with open(input_file, "r") as raw_file:
+        for line in raw_file:
+            if line[0] == line_type:
+                if single_idx:
+                    all_vars.append(line[single_idx-1])
+                else:
+                    all_vars.append(line[start_idx-1:end_idx])
+    return all_vars
+
+###################################################################################
+###################################################################################
+###################################################################################
+
+
+def parse_reconstructed_geo_output(df, geo_col="NAME"):
+    """ Parses the `geo_col` column of the reconstructions in to block, block group, tract, county and state columns.
+    """
+    df[["block", "bg", "tract", "county", "state"]] = df[geo_col].str.split(", ", expand=True)
+    df["block"] = df["block"].str.split(expand=True)[1]
+    df["bg"] = df["bg"].str.split(expand=True)[2]
+    df["tract"] = df["tract"].str.split(expand=True)[2]
+    df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
+    return df
+
+def build_enumdist_col(df):
+    """
+    """
+    df["enumdist"] = df[["tract", "bg", "block"]].apply(lambda x: ''.join(x), axis=1)
+    return df
+
+def get_sample_1940_hh():
+    """ Returns a sample Household and Person line. These lines are randomly taken from the 1940 alabama.
+    """
+    hh_line = "H19400200024278096700000001000009100000000001198632410100102100000009999000260300026007000840199990012200020999999901223233100110101000000001000900000000100090"
+    return hh_line
+
+def get_sample_1940_person():
+    """
+    """
+    person_line = "P19400200024278000900000001000000000000110109213070306030000019999090901101499600000110000000010010003703700018018000000000010212120030303331099599909950000000000009999999999990000000100000009999999999991109909999199990072199990000000A59B1CD2-5F9A-47AB-AF36-E5F4D7F65F0B020"
+    return person_line
+
+def parse_positions_hh(line):
+    """ Parse positions of Household lines for the input files
+        and return it as a dictionary.
+    """
+    dictionary = dict()
+    dictionary["RECTYPE"] = line[0:1]
+    dictionary["YEAR"] = line[1:5]
+    dictionary["DATANUM"] = line[5:7]
+    dictionary["SERIAL"] = line[7:15]
+    dictionary["NUMPREC"] = line[15:17]
+    dictionary["SUBSAMP"] = line[17:19]
+    dictionary["HHWT"] = line[19:29]
+    dictionary["NUMPERHH"] = line[29:33]
+    dictionary["HHTYPE"] = line[33:34]
+    dictionary["DWELLING"] = line[34:42]
+    dictionary["SLPERNUM"] = line[42:44]
+    dictionary["CPI99"] = line[44:49]
+    dictionary["REGION"] = line[49:51]
+    dictionary["STATEICP"] = line[51:53]
+    dictionary["STATEFIP"] = line[53:55]
+    dictionary["COUNTY"] = line[55:59]
+    dictionary["URBAN"] = line[59:60]
+    dictionary["METRO"] = line[60:61]
+    dictionary["METAREA"] = line[61:64]
+    dictionary["METAREAD"] = line[64:68]
+    dictionary["CITY"] = line[68:72]
+    dictionary["CITYPOP"] = line[72:77]
+    dictionary["SIZEPL"] = line[77:79]
+    dictionary["URBPOP"] = line[79:84]
+    dictionary["SEA"] = line[84:87]
+    dictionary["WARD"] = line[87:90]
+    dictionary["CNTRY"] = line[90:93]
+    dictionary["GQ"] = line[93:94]
+    dictionary["GQTYPE"] = line[94:95]
+    dictionary["GQTYPED"] = line[95:98]
+    dictionary["GQFUNDS"] = line[98:100]
+    dictionary["FARM"] = line[100:101]
+    dictionary["OWNERSHP"] = line[101:102]
+    dictionary["OWNERSHPD"] = line[102:104]
+    dictionary["RENT"] = line[104:108]
+    dictionary["VALUEH"] = line[108:115]
+    dictionary["NFAMS"] = line[115:117]
+    dictionary["NSUBFAM"] = line[117:118]
+    dictionary["NCOUPLES"] = line[118:119]
+    dictionary["NMOTHERS"] = line[119:120]
+    dictionary["NFATHERS"] = line[120:121]
+    dictionary["MULTGEN"] = line[121:122]
+    dictionary["MULTGEND"] = line[122:124]
+    dictionary["ENUMDIST"] = line[124:128]
+    dictionary["SUPDIST"] = line[128:131]
+    dictionary["RESPOND"] = line[131:132]
+    dictionary["SPLIT"] = line[132:133]
+    dictionary["SPLITHID"] = line[133:141]
+    dictionary["SPLITNUM"] = line[141:145]
+    dictionary["SPLIT40"] = line[145:146]
+    dictionary["SERIAL40"] = line[146:154]
+    dictionary["NUMPREC40"] = line[154:158]
+    dictionary["EDMISS"] = line[158:159]
+
+    return dictionary
+
+def parse_positions_person(line):
+    """ Parse positions of Person lines for the input files
+        and return it as a dictionary.
+    """
+    dictionary = dict()
+    dictionary["RECTYPE"] = line[0:1]
+    dictionary["YEAR"] = line[1:5]
+    dictionary["DATANUM"] = line[5:7]
+    dictionary["SERIAL"] = line[7:15]
+    dictionary["PERNUM"] = line[15:19]
+    dictionary["PERWT"] = line[19:29]
+    dictionary["SLWT"] = line[29:39]
+    dictionary["SLREC"] = line[39:40]
+    dictionary["RESPONDT"] = line[40:41]
+    dictionary["FAMUNIT"] = line[41:43]
+    dictionary["FAMSIZE"] = line[43:45]
+    dictionary["SUBFAM"] = line[45:46]
+    dictionary["SFTYPE"] = line[46:47]
+    dictionary["SFRELATE"] = line[47:48]
+    dictionary["MOMLOC"] = line[48:50]
+    dictionary["STEPMOM"] = line[50:51]
+    dictionary["MOMRULE_HIST"] = line[51:52]
+    dictionary["POPLOC"] = line[52:54]
+    dictionary["STEPPOP"] = line[54:55]
+    dictionary["POPRULE_HIST"] = line[55:56]
+    dictionary["SPLOC"] = line[56:58]
+    dictionary["SPRULE_HIST"] = line[58:59]
+    dictionary["NCHILD"] = line[59:60]
+    dictionary["NCHLT5"] = line[60:61]
+    dictionary["NSIBS"] = line[61:62]
+    dictionary["ELDCH"] = line[62:64]
+    dictionary["YNGCH"] = line[64:66]
+    dictionary["RELATE"] = line[66:68]
+    dictionary["RELATED"] = line[68:72]
+    dictionary["SEX"] = line[72:73]
+    dictionary["AGE"] = line[73:76]
+    dictionary["AGEMONTH"] = line[76:78]
+    dictionary["MARST"] = line[78:79]
+    dictionary["MARRNO"] = line[79:80]
+    dictionary["AGEMARR"] = line[80:82]
+    dictionary["CHBORN"] = line[82:84]
+    dictionary["RACE"] = line[84:85]
+    dictionary["RACED"] = line[85:88]
+    dictionary["HISPAN"] = line[88:89]
+    dictionary["HISPAND"] = line[89:92]
+    dictionary["BPL"] = line[92:95]
+    dictionary["BPLD"] = line[95:100]
+    dictionary["MBPL"] = line[100:103]
+    dictionary["MBPLD"] = line[103:108]
+    dictionary["FBPL"] = line[108:111]
+    dictionary["FBPLD"] = line[111:116]
+    dictionary["NATIVITY"] = line[116:117]
+    dictionary["CITIZEN"] = line[117:118]
+    dictionary["MTONGUE"] = line[118:120]
+    dictionary["MTONGUED"] = line[120:124]
+    dictionary["SPANNAME"] = line[124:125]
+    dictionary["HISPRULE"] = line[125:126]
+    dictionary["SCHOOL"] = line[126:127]
+    dictionary["HIGRADE"] = line[127:129]
+    dictionary["HIGRADED"] = line[129:132]
+    dictionary["EDUC"] = line[132:134]
+    dictionary["EDUCD"] = line[134:137]
+    dictionary["EMPSTAT"] = line[137:138]
+    dictionary["EMPSTATD"] = line[138:140]
+    dictionary["LABFORCE"] = line[140:141]
+    dictionary["OCC"] = line[141:145]
+    dictionary["OCC1950"] = line[145:148]
+    dictionary["IND"] = line[148:152]
+    dictionary["IND1950"] = line[152:155]
+    dictionary["CLASSWKR"] = line[155:156]
+    dictionary["CLASSWKRD"] = line[156:158]
+    dictionary["WKSWORK1"] = line[158:160]
+    dictionary["WKSWORK2"] = line[160:161]
+    dictionary["HRSWORK1"] = line[161:163]
+    dictionary["HRSWORK2"] = line[163:164]
+    dictionary["DURUNEMP"] = line[164:167]
+    dictionary["UOCC"] = line[167:170]
+    dictionary["UOCC95"] = line[170:173]
+    dictionary["UIND"] = line[173:176]
+    dictionary["UCLASSWK"] = line[176:177]
+    dictionary["INCWAGE"] = line[177:183]
+    dictionary["INCNONWG"] = line[183:184]
+    dictionary["OCCSCORE"] = line[184:186]
+    dictionary["SEI"] = line[186:188]
+    dictionary["PRESGL"] = line[188:191]
+    dictionary["ERSCOR50"] = line[191:195]
+    dictionary["EDSCOR50"] = line[195:199]
+    dictionary["NPBOSS50"] = line[199:203]
+    dictionary["MIGRATE5"] = line[203:204]
+    dictionary["MIGRATE5D"] = line[204:206]
+    dictionary["MIGPLAC5"] = line[206:209]
+    dictionary["MIGMET5"] = line[209:213]
+    dictionary["MIGTYPE5"] = line[213:214]
+    dictionary["MIGCITY5"] = line[214:218]
+    dictionary["MIGSEA5"] = line[218:221]
+    dictionary["SAMEPLAC"] = line[221:222]
+    dictionary["SAMESEA5"] = line[222:223]
+    dictionary["MIGCOUNTY"] = line[223:227]
+    dictionary["VETSTAT"] = line[227:228]
+    dictionary["VETSTATD"] = line[228:230]
+    dictionary["VET1940"] = line[230:231]
+    dictionary["VETWWI"] = line[231:232]
+    dictionary["VETPER"] = line[232:233]
+    dictionary["VETCHILD"] = line[233:234]
+    dictionary["HISTID"] = line[234:270]
+    dictionary["SURSIM"] = line[270:272]
+    dictionary["SSENROLL"] = line[272:273]
+    return dictionary
+
+def left_pad_with_zeros(number, target_len):
+    """ Left-pads a number with 0s until the string gets to length `target_len`.
+        Eg. if number is 123 and target_len = 5, the return value is `00123`.
+        
+        Note: `number` doesn't necessarily have to be a number for the function to work. 
+    """
+    str_num = str(number)
+    assert(len(str_num) <= target_len)
+    
+    zeros_needed = target_len - len(str_num)
+    prefix = ''
+    for i in range(zeros_needed):
+        prefix += '0'
+
+    return prefix + str_num
+
+def modify_age(line, age, age_len=3, age_col="AGE"):
+    """ Change the `AGE` value of the dictionary `line`.
+    """
+    line[age_col] = left_pad_with_zeros(age, age_len)
+    return line
+
+def modify_race(line, race, race_col="RACE"):
+    """ Changes the `race` field of the dict `line` with the mapping 
+        Denis sent Bhushan of the reconstruction outputs to the RACE fields 
+        in the ipums data format here: https://usa.ipums.org/usa/resources/1940CensusDASTestData/EXT1940USCB.cbk
+        
+    """
+    if len(race) == 2:
+        line[race_col] = '8'
+    elif len(race) >= 3:
+        line[race_col] = '9'
+    elif race == "w":
+        line[race_col] = '1'
+    elif race == "b":
+        line[race_col] = '2'
+    elif race == "i":
+        line[race_col] = '3'
+    elif race == "a":
+        """ The reconstruction outputs only "a" for asian but there are 
+            more than 1 kind of asian you can be in ipums format. I have
+            gone for Chinese (4) to denote asian to label all the asians together.
+        """
+        line[race_col] = '4'
+    elif race == "h":
+        line[race_col] = '6'
+    elif race == "o":
+        line[race_col] = '7'
+    else:
+        raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
+    
+    return line
+    
+def modify_hisp(line, hisp, hisp_col="HISPAN"):
+    """
+    """
+    assert(str(hisp) in ['0', '1'])
+    line[hisp_col] = str(hisp)
+    return line
+
+def modify_gqtype(line, gqtype, gqtype_col="GQTYPE"):
+    """
+    """
+    assert(len(str(gqtype)) == 1)
+    line[gqtype_col] = str(gqtype)
+    return line
+
+def modify_gq(line, gq, gq_col="GQ"):
+    """
+    """
+    assert(len(str(gq))==1)
+    line[gq_col] = str(gq)
+    return line
+
+def modify_serial(line, serial, serial_len=8, serial_col="SERIAL"):
+    """
+    """
+    line[serial_col] = left_pad_with_zeros(serial, serial_len)
+    return line
+
+def modify_state(line, state, state_col="STATEFIP", state_len=2):
+    """
+    """
+    line[state_col] = left_pad_with_zeros(state, state_len)
+    return line
+
+def modify_county(line, county, county_col="COUNTY", county_len=3):
+    """
+    """
+    line[county_col] = left_pad_with_zeros(county, county_len)
+    return line
+
+def modify_enumdist(line, enumdist, enumdist_col="ENUMDIST"):
+    """
+    """
+    line[enumdist] = enumdist
+    return line
+
+def get_texas_county_fips_code_map():
+    """ 
+    """
+    county_names = [
+        "Anderson",
+        "Andrews",
+        "Angelina",
+        "Aransas",
+        "Archer",
+        "Armstrong",
+        "Atascosa",
+        "Austin",
+        "Bailey",
+        "Bandera",
+        "Bastrop",
+        "Baylor",
+        "Bee",
+        "Bell",
+        "Bexar",
+        "Blanco",
+        "Borden",
+        "Bosque",
+        "Bowie",
+        "Brazoria",
+        "Brazos",
+        "Brewster",
+        "Briscoe",
+        "Brooks",
+        "Brown",
+        "Burleson",
+        "Burnet",
+        "Caldwell",
+        "Calhoun",
+        "Callahan",
+        "Cameron",
+        "Camp",
+        "Carson",
+        "Cass",
+        "Castro",
+        "Chambers",
+        "Cherokee",
+        "Childress",
+        "Clay",
+        "Cochran",
+        "Coke",
+        "Coleman",
+        "Collin",
+        "Collingsworth",
+        "Colorado",
+        "Comal",
+        "Comanche",
+        "Concho",
+        "Cooke",
+        "Coryell",
+        "Cottle",
+        "Crane",
+        "Crockett",
+        "Crosby",
+        "Culberson",
+        "Dallam",
+        "Dallas",
+        "Dawson",
+        "Deaf Smith",
+        "Delta",
+        "Denton",
+        "DeWitt",
+        "Dickens",
+        "Dimmit",
+        "Donley",
+        "Duval",
+        "Eastland",
+        "Ector",
+        "Edwards",
+        "Ellis",
+        "El Paso",
+        "Erath",
+        "Falls",
+        "Fannin",
+        "Fayette",
+        "Fisher",
+        "Floyd",
+        "Foard",
+        "Fort Bend",
+        "Franklin",
+        "Freestone",
+        "Frio",
+        "Gaines",
+        "Galveston",
+        "Garza",
+        "Gillespie",
+        "Glasscock",
+        "Goliad",
+        "Gonzales",
+        "Gray",
+        "Grayson",
+        "Gregg",
+        "Grimes",
+        "Guadalupe",
+        "Hale",
+        "Hall",
+        "Hamilton",
+        "Hansford",
+        "Hardeman",
+        "Hardin",
+        "Harris",
+        "Harrison",
+        "Hartley",
+        "Haskell",
+        "Hays",
+        "Hemphill",
+        "Henderson",
+        "Hidalgo",
+        "Hill",
+        "Hockley",
+        "Hood",
+        "Hopkins",
+        "Houston",
+        "Howard",
+        "Hudspeth",
+        "Hunt",
+        "Hutchinson",
+        "Irion",
+        "Jack",
+        "Jackson",
+        "Jasper",
+        "Jeff Davis",
+        "Jefferson",
+        "Jim Hogg",
+        "Jim Wells",
+        "Johnson",
+        "Jones",
+        "Karnes",
+        "Kaufman",
+        "Kendall",
+        "Kenedy",
+        "Kent",
+        "Kerr",
+        "Kimble",
+        "King",
+        "Kinney",
+        "Kleberg",
+        "Knoxv",
+        "Lamar",
+        "Lamb",
+        "Lampasas",
+        "La Salle",
+        "Lavaca",
+        "Lee",
+        "Leon",
+        "Liberty",
+        "Limestone",
+        "Lipscomb",
+        "Live Oak",
+        "Llano",
+        "Loving",
+        "Lubbock",
+        "Lynn",
+        "McCulloch",
+        "McLennan",
+        "McMullen",
+        "Madison",
+        "Marion",
+        "Martin",
+        "Mason",
+        "Matagorda",
+        "Maverick",
+        "Medina",
+        "Menard",
+        "Midland",
+        "Milam",
+        "Mills",
+        "Mitchell",
+        "Montague",
+        "Montgomery",
+        "Moore",
+        "Morris",
+        "Motley",
+        "Nacogdoches",
+        "Navarro",
+        "Newton",
+        "Nolan",
+        "Nueces",
+        "Ochiltree",
+        "Oldham",
+        "Orange",
+        "Palo Pinto",
+        "Panola",
+        "Parker",
+        "Parmer",
+        "Pecos",
+        "Polk",
+        "Potter",
+        "Presidio",
+        "Rains",
+        "Randall",
+        "Reagan",
+        "Real",
+        "Red River",
+        "Reeves",
+        "Refugio",
+        "Roberts",
+        "Robertson",
+        "Rockwall",
+        "Runnels",
+        "Rusk",
+        "Sabine",
+        "San Augustine",
+        "San Jacinto",
+        "San Patricio",
+        "San Saba",
+        "Schleicher",
+        "Scurry",
+        "Shackelford",
+        "Shelby",
+        "Sherman",
+        "Smith",
+        "Somervell",
+        "Starr",
+        "Stephens",
+        "Sterling",
+        "Stonewall",
+        "Sutton",
+        "Swisher",
+        "Tarrant",
+        "Taylor",
+        "Terrell",
+        "Terry",
+        "Throckmorton",
+        "Titus",
+        "Tom Green",
+        "Travis",
+        "Trinity",
+        "Tyler",
+        "Upshur",
+        "Upton",
+        "Uvalde",
+        "Val Verde",
+        "Van Zandt",
+        "Victoria",
+        "Walker",
+        "Waller",
+        "Ward",
+        "Washington",
+        "Webb",
+        "Wharton",
+        "Wheeler",
+        "Wichita",
+        "Wilbarger",
+        "Willacy",
+        "Williamson",
+        "Wilson",
+        "Winkler",
+        "Wise",
+        "Wood",
+        "Yoakum",
+        "Young",
+        "Zapata",
+        "Zavala"
+    ]
+
+    fips_code_map = dict()
+
+    counter = 1
+    for county in county_names:
+        fips_code_map[county] = left_pad_with_zeros(counter, 3)
+        counter += 2
+
+    return fips_code_map
+
+def convert_to_hh_line_delimited(hh):
+    """
+    """
+    hh_fields = ['RECTYPE', 'YEAR', 'DATANUM', 'SERIAL', 'NUMPREC', 'SUBSAMP',
+                 'HHWT', 'NUMPERHH', 'HHTYPE', 'DWELLING', 'SLPERNUM', 'CPI99',
+                 'REGION', 'STATEICP', 'STATEFIP', 'COUNTY', 'URBAN', 'METRO',
+                 'METAREA', 'METAREAD', 'CITY', 'CITYPOP', 'SIZEPL', 'URBPOP',
+                 'SEA', 'WARD', 'CNTRY', 'GQ', 'GQTYPE', 'GQTYPED', 'GQFUNDS',
+                 'FARM', 'OWNERSHP', 'OWNERSHPD', 'RENT', 'VALUEH', 'NFAMS',
+                 'NSUBFAM', 'NCOUPLES', 'NMOTHERS', 'NFATHERS', 'MULTGEN',
+                 'MULTGEND', 'ENUMDIST', 'SUPDIST', 'RESPOND', 'SPLIT', 'SPLITHID',
+                 'SPLITNUM', 'SPLIT40', 'SERIAL40', 'NUMPREC40', 'EDMISS']
+
+    line_list = []
+    for field in hh_fields:
+        line_list.append(hh[field])
+
+    # append a new line at the end
+    line_list.append("\n")
+
+    line = '|'.join(line_list)
+    return line
+
+
+def convert_to_person_line_delimited(person):
+    """
+    """
+    person_fields = ['RECTYPE', 'YEAR', 'DATANUM', 'SERIAL', 'PERNUM', 'PERWT',
+                     'SLWT', 'SLREC', 'RESPONDT', 'FAMUNIT', 'FAMSIZE', 'SUBFAM',
+                     'SFTYPE', 'SFRELATE', 'MOMLOC', 'STEPMOM', 'MOMRULE_HIST',
+                     'POPLOC', 'STEPPOP', 'POPRULE_HIST', 'SPLOC', 'SPRULE_HIST',
+                     'NCHILD', 'NCHLT5', 'NSIBS', 'ELDCH', 'YNGCH', 'RELATE',
+                     'RELATED', 'SEX', 'AGE', 'AGEMONTH', 'MARST', 'MARRNO',
+                     'AGEMARR', 'CHBORN', 'RACE', 'RACED', 'HISPAN', 'HISPAND',
+                     'BPL', 'BPLD', 'MBPL', 'MBPLD', 'FBPL', 'FBPLD', 'NATIVITY',
+                     'CITIZEN', 'MTONGUE', 'MTONGUED', 'SPANNAME', 'HISPRULE',
+                     'SCHOOL', 'HIGRADE', 'HIGRADED', 'EDUC', 'EDUCD', 'EMPSTAT',
+                     'EMPSTATD', 'LABFORCE', 'OCC', 'OCC1950', 'IND', 'IND1950',
+                     'CLASSWKR', 'CLASSWKRD', 'WKSWORK1', 'WKSWORK2', 'HRSWORK1',
+                     'HRSWORK2', 'DURUNEMP', 'UOCC', 'UOCC95', 'UIND', 'UCLASSWK',
+                     'INCWAGE', 'INCNONWG', 'OCCSCORE', 'SEI', 'PRESGL', 'ERSCOR50',
+                     'EDSCOR50', 'NPBOSS50', 'MIGRATE5', 'MIGRATE5D', 'MIGPLAC5',
+                     'MIGMET5', 'MIGTYPE5', 'MIGCITY5', 'MIGSEA5', 'SAMEPLAC',
+                     'SAMESEA5', 'MIGCOUNTY', 'VETSTAT', 'VETSTATD', 'VET1940',
+                     'VETWWI', 'VETPER', 'VETCHILD', 'HISTID', 'SURSIM', 'SSENROLL']
+
+    line_list = []
+    for field in person_fields:
+        line_list.append(person[field])
+
+    # append a new line at the end
+    line_list.append("\n")
+
+    line = '|'.join(line_list)
+    return line
+
+def build_person_line(serial, age, hisp, race):
+    """
+    """
+    person_line = get_sample_1940_person()
+    person = parse_positions_person(person_line)
+    person = modify_serial(person, serial)
+    person = modify_age(person, age)
+    person = modify_hisp(person, hisp)
+    person = modify_race(person, race)
+
+    person_line = convert_to_person_line_delimited(person)
+    return person_line
+
+def build_hh_line(serial, gq, gqtype, state, county, enumdist):
+    """
+    """
+    sample_line = get_sample_1940_hh()
+    hh = parse_positions_hh(sample_line)
+
+    hh = modify_serial(hh, serial)
+    hh = modify_gq(hh, gq)
+    hh = modify_gqtype(hh, gqtype)
+    hh = modify_state(hh, state)
+    hh = modify_county(hh, county)
+    hh = modify_enumdist(hh, enumdist)
+    hh_line = convert_to_hh_line_delimited(hh)
+    return hh_line
+
+def write_household_to_file(write_file, hh_line, person_lines):
+    """
+    """
+    write_file.write(hh_line)
+    for person_line in person_lines:
+        write_file.write(person_line)
+
+fips_map = get_texas_county_fips_code_map()
+
+def county_fips(county):
+    """
+    """
+    return fips_map[county]
+
+def state_fips(state):
+    """ TODO: Hacky
+    """
+    if state == "Texas":
+        return '48'
+
+def read_and_process_reconstructed_csvs(dir_name):
+    """ 
+    """
+    print("Reading files...")
+    df = read_reconstructions(dir_name)
+    df = parse_reconstructed_geo_output(df)           
+    df = build_enumdist_col(df)
+    
+    df["state"] = df["state"].apply(lambda state: state_fips(state))
+    df["county"] = df["county"].apply(lambda county: county_fips(county))
+    print("Completed reading files")
+    
+    return df
+
+def read_reconstructions(dir_name):
+    """
+    """
+    main_df = pd.DataFrame()
+    for root, dirs, files in os.walk(dir_name):
+        for file in files:
+            if file[-3:] != "csv":
+                continue
+
+            curr_df = pd.read_csv(os.path.join(root, file))
+            curr_df = parse_reconstructed_geo_output(curr_df)
+            curr_df = build_enumdist_col(curr_df)
+
+            main_df = pd.concat([main_df, curr_df])
+            
+    return main_df
+
+
+def convert_reconstructions_to_ipums(dir_name, 
+                                     save_fp,
+                                     hh_size=5,
+                                     gq=1,
+                                     gqtype=0,
+                                     break_size=500):
+    """ Converts all the .csvs in `dir_name` into ipums format lines and saves the file to `save_fp`.
+    """
+    # read the files, and process them
+    df = read_and_process_reconstructed_csvs(dir_name)
+
+    print("Grouping the data at a block level...")
+    groups = df.groupby(["state", "county", "tract", "bg", "block"])
+    print("Finished grouping the data.")
+    total_written = 0
+    counter = 0 # counter at a block level
+    
+    with open(save_fp, "w+") as write_file:
+        serial = 1
+        for ((state, county, tract, bg, block), group) in groups:
+            
+            counter += 1
+            if counter % break_size == 0:
+                print("Writing block {} of {}.".format(counter, len(groups)))
+                
+            block_df = df[(df["state"]==state) & (df["county"]==county) & (df["tract"]==tract) & (df["bg"]==bg) & (df["block"]==block)]
+            person_lines = []
+            
+            for (_, row) in block_df.iterrows():
+                person_line = build_person_line(serial, row["age"], row["ethn"], row["race"])
+                person_lines.append(person_line)
+
+                if (len(person_lines) == hh_size):
+                    hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
+                    write_household_to_file(write_file, hh_line, person_lines)
+                    serial += 1
+                    person_lines = []
+            
+            if len(person_lines) > 0:
+                # scoop up the remaining lines that are not % hh_size == 0
+                hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
+                write_household_to_file(write_file, hh_line, person_lines)
+                serial += 1
+                person_lines = []
+
+
