@@ -398,29 +398,29 @@ def modify_race(line, race, race_col="RACE"):
         https://usa.ipums.org/usa/resources/1940CensusDASTestData/EXT1940USCB.cbk
         
     """
-    if len(race) == 2:
-        line[race_col] = '8'
-    elif len(race) >= 3:
-        line[race_col] = '9'
-    elif race == "w":
-        line[race_col] = '1'
-    elif race == "b":
-        line[race_col] = '2'
-    elif race == "i":
-        line[race_col] = '3'
-    elif race == "a":
-        """ The reconstruction outputs only "a" for asian but there are 
-            more than 1 kind of asian you can be in ipums format. I have
-            gone for Chinese (4) to denote asian to label all the asians together.
-        """
-        line[race_col] = '4'
-    elif race == "h":
-        line[race_col] = '6'
-    elif race == "o":
-        line[race_col] = '7'
-    else:
-        raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
-    
+    # if len(race) == 2:
+    #     line[race_col] = '8'
+    # elif len(race) >= 3:
+    #     line[race_col] = '9'
+    # elif race == "w":
+    #     line[race_col] = '1'
+    # elif race == "b":
+    #     line[race_col] = '2'
+    # elif race == "i":
+    #     line[race_col] = '3'
+    # elif race == "a":
+    #    """ The reconstruction outputs only "a" for asian but there are 
+    #        more than 1 kind of asian you can be in ipums format. I have
+    #        gone for Chinese (4) to denote asian to label all the asians together.
+    #    """
+    #     line[race_col] = '4'
+    # elif race == "h":
+    #     line[race_col] = '6'
+    # elif race == "o":
+    #     line[race_col] = '7'
+    # else:
+    #     raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
+    line[race_col] = '2'
     return line
     
 def modify_hisp(line, hisp, hisp_col="HISPAN"):
@@ -472,7 +472,7 @@ def modify_enumdist(line, enumdist, enumdist_col="ENUMDIST"):
     """ Changes the `enumdist_col` value of the dictionary `line` to `enumdist`, 
         and returns the new updated dictionary. 
     """
-    line[enumdist] = enumdist
+    line[enumdist_col] = enumdist
     return line
 
 def get_texas_county_fips_code_map():
@@ -764,9 +764,10 @@ def convert_to_hh_line_delimited(hh):
         line_list.append(hh[field])
 
     # append a new line at the end
-    line_list.append("\n")
+    # line_list.append("\n")
 
     line = '|'.join(line_list)
+    line = line + "\n"
     return line
 
 
@@ -798,9 +799,10 @@ def convert_to_person_line_delimited(person):
         line_list.append(person[field])
 
     # append a new line at the end
-    line_list.append("\n")
+    # line_list.append("\n")
 
     line = '|'.join(line_list)
+    line = line + "\n"
     return line
 
 def build_person_line(serial, age, hisp, race):
@@ -895,6 +897,12 @@ def read_reconstructions(dir_name):
             curr_df = pd.read_csv(os.path.join(root, file))
             curr_df = parse_reconstructed_geo_output(curr_df)
             curr_df = build_enumdist_col(curr_df)
+
+            # duplicate the rows based on the column `sol` i.e if sol = 3 that row is 
+            # converted into 3 rows.
+            curr_df = pd.DataFrame([curr_df.loc[idx] 
+                                    for idx in curr_df.index 
+                                    for _ in range(curr_df.loc[idx]['sol'])]).reset_index(drop=True)
 
             main_df = pd.concat([main_df, curr_df])
             
