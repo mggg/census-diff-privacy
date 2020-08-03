@@ -182,26 +182,26 @@ def parse_reconstructed_geo_output(df, geo_col="NAME"):
     return df
 
 def build_enumdist_col(df):
-    """
+    """ Concatenates the tract, bg (block group) and block columns of `df` to produce an "enumdist" column.
+        Returns the new dataframe.
     """
     df["enumdist"] = df[["tract", "bg", "block"]].apply(lambda x: ''.join(x), axis=1)
     return df
 
 def get_sample_1940_hh():
-    """ Returns a sample Household and Person line. These lines are randomly taken from the 1940 alabama.
+    """ Returns a sample Household line of 1940 ipums format. This line was randomly taken from the 1940 alabama.
     """
     hh_line = "H19400200024278096700000001000009100000000001198632410100102100000009999000260300026007000840199990012200020999999901223233100110101000000001000900000000100090"
     return hh_line
 
 def get_sample_1940_person():
-    """
+    """ Returns a sample Person line of 1940 ipums format. This line was randomly taken from the 1940 alabama.
     """
     person_line = "P19400200024278000900000001000000000000110109213070306030000019999090901101499600000110000000010010003703700018018000000000010212120030303331099599909950000000000009999999999990000000100000009999999999991109909999199990072199990000000A59B1CD2-5F9A-47AB-AF36-E5F4D7F65F0B020"
     return person_line
 
 def parse_positions_hh(line):
-    """ Parse positions of Household lines for the input files
-        and return it as a dictionary.
+    """ Parse positions of Household lines for the input files and return it as a dictionary.
     """
     dictionary = dict()
     dictionary["RECTYPE"] = line[0:1]
@@ -261,8 +261,7 @@ def parse_positions_hh(line):
     return dictionary
 
 def parse_positions_person(line):
-    """ Parse positions of Person lines for the input files
-        and return it as a dictionary.
+    """ Parse positions of Person lines for the input files and return it as a dictionary.
     """
     dictionary = dict()
     dictionary["RECTYPE"] = line[0:1]
@@ -386,15 +385,17 @@ def left_pad_with_zeros(number, target_len):
     return prefix + str_num
 
 def modify_age(line, age, age_len=3, age_col="AGE"):
-    """ Change the `AGE` value of the dictionary `line`.
+    """ Changes the age value of the dictionary `line`, 
+        and returns the new updated dictionary.
     """
-    line[age_col] = left_pad_with_zeros(age, age_len)
+    line[age_col] = left_pad_with_zeros(str(age), age_len)
     return line
 
 def modify_race(line, race, race_col="RACE"):
     """ Changes the `race` field of the dict `line` with the mapping 
         Denis sent Bhushan of the reconstruction outputs to the RACE fields 
-        in the ipums data format here: https://usa.ipums.org/usa/resources/1940CensusDASTestData/EXT1940USCB.cbk
+        in the ipums data format here: 
+        https://usa.ipums.org/usa/resources/1940CensusDASTestData/EXT1940USCB.cbk
         
     """
     if len(race) == 2:
@@ -423,52 +424,60 @@ def modify_race(line, race, race_col="RACE"):
     return line
     
 def modify_hisp(line, hisp, hisp_col="HISPAN"):
-    """
+    """ Changes the `hisp_col` value of the dictionary `line` to `hisp`, 
+        and returns the new updated dictionary. 
     """
     assert(str(hisp) in ['0', '1'])
     line[hisp_col] = str(hisp)
     return line
 
 def modify_gqtype(line, gqtype, gqtype_col="GQTYPE"):
-    """
+    """ Changes the `gqtype_col` value of the dictionary `line` to `gqtype`, 
+        and returns the new updated dictionary. 
     """
     assert(len(str(gqtype)) == 1)
     line[gqtype_col] = str(gqtype)
     return line
 
 def modify_gq(line, gq, gq_col="GQ"):
-    """
+    """ Changes the `gq_col` value of the dictionary `line` to `gq`, 
+        and returns the new updated dictionary. 
     """
     assert(len(str(gq))==1)
     line[gq_col] = str(gq)
     return line
 
 def modify_serial(line, serial, serial_len=8, serial_col="SERIAL"):
-    """
+    """ Changes the `serial_col` value of the dictionary `line` to `serial`, 
+        and returns the new updated dictionary. 
     """
     line[serial_col] = left_pad_with_zeros(serial, serial_len)
     return line
 
 def modify_state(line, state, state_col="STATEFIP", state_len=2):
-    """
+    """ Changes the `state_col` value of the dictionary `line` to `state`, 
+        and returns the new updated dictionary. 
     """
     line[state_col] = left_pad_with_zeros(state, state_len)
     return line
 
 def modify_county(line, county, county_col="COUNTY", county_len=3):
-    """
+    """ Changes the `county_col` value of the dictionary `line` to `county`, 
+        and returns the new updated dictionary. 
     """
     line[county_col] = left_pad_with_zeros(county, county_len)
     return line
 
 def modify_enumdist(line, enumdist, enumdist_col="ENUMDIST"):
-    """
+    """ Changes the `enumdist_col` value of the dictionary `line` to `enumdist`, 
+        and returns the new updated dictionary. 
     """
     line[enumdist] = enumdist
     return line
 
 def get_texas_county_fips_code_map():
-    """ 
+    """ Returns a dictionary that has the name of Texas counties as keys and their corresponding
+        county fips codes as values.
     """
     county_names = [
         "Anderson",
@@ -737,7 +746,8 @@ def get_texas_county_fips_code_map():
     return fips_code_map
 
 def convert_to_hh_line_delimited(hh):
-    """
+    """ Takes in the dictionary `hh` and returns a pipe-delimited line with the values in the order
+        of the `hh_fields` list below.
     """
     hh_fields = ['RECTYPE', 'YEAR', 'DATANUM', 'SERIAL', 'NUMPREC', 'SUBSAMP',
                  'HHWT', 'NUMPERHH', 'HHTYPE', 'DWELLING', 'SLPERNUM', 'CPI99',
@@ -761,7 +771,8 @@ def convert_to_hh_line_delimited(hh):
 
 
 def convert_to_person_line_delimited(person):
-    """
+    """ Takes in the dictionary `person` and returns a pipe-delimited line with the values in the order
+        of the `person_fields` list below.
     """
     person_fields = ['RECTYPE', 'YEAR', 'DATANUM', 'SERIAL', 'PERNUM', 'PERWT',
                      'SLWT', 'SLREC', 'RESPONDT', 'FAMUNIT', 'FAMSIZE', 'SUBFAM',
@@ -793,7 +804,9 @@ def convert_to_person_line_delimited(person):
     return line
 
 def build_person_line(serial, age, hisp, race):
-    """
+    """ Generates a Person line in 1940s ipums format and changes its 
+        `serial`, `age`, `hisp` and `race`.
+        Returns the line.
     """
     person_line = get_sample_1940_person()
     person = parse_positions_person(person_line)
@@ -806,7 +819,9 @@ def build_person_line(serial, age, hisp, race):
     return person_line
 
 def build_hh_line(serial, gq, gqtype, state, county, enumdist):
-    """
+    """ Generates a Household line in 1940s ipums format and changes its 
+        `serial`, `gq`, `gqtype`, `state`, `county` and `enudmist`.
+        Returns the line.
     """
     sample_line = get_sample_1940_hh()
     hh = parse_positions_hh(sample_line)
@@ -821,7 +836,10 @@ def build_hh_line(serial, gq, gqtype, state, county, enumdist):
     return hh_line
 
 def write_household_to_file(write_file, hh_line, person_lines):
-    """
+    """ Writes `hh_line` and all the person lines in the list `person_lines`
+        to the open file object `write_file`.
+        The `hh_line` is written first, and then the `person_lines` are written.
+        The ideas is that all the people in person lines are in the same household.
     """
     write_file.write(hh_line)
     for person_line in person_lines:
@@ -830,18 +848,27 @@ def write_household_to_file(write_file, hh_line, person_lines):
 fips_map = get_texas_county_fips_code_map()
 
 def county_fips(county):
-    """
+    """ Given a Texas county name (eg. "Dallas"), returns a 3 char fips code
+        of the county.
     """
     return fips_map[county]
 
 def state_fips(state):
-    """ TODO: Hacky
+    """ Given a State name (eg. "Texas"), returns a 2 char fips code.
+        Hacky: currently only supports Texas lol.
     """
     if state == "Texas":
         return '48'
 
 def read_and_process_reconstructed_csvs(dir_name):
-    """ 
+    """ Reads all the .csvs in filepath `dir_name` and concats them 
+        into one dataframe.
+        Proceeds to post-process the data frame to seperate state, county, 
+        tract, block group and block. The tract, block group and block are
+        concatenated together to form an `enumdist`.
+        Also converts the state and county to their fips codes.
+
+        Returns this df.
     """
     print("Reading files...")
     df = read_reconstructions(dir_name)
@@ -855,7 +882,9 @@ def read_and_process_reconstructed_csvs(dir_name):
     return df
 
 def read_reconstructions(dir_name):
-    """
+    """ Reads all the .csvs in filepath `dir_name` and concats them 
+        into one dataframe.
+        Returns this dataframe.
     """
     main_df = pd.DataFrame()
     for root, dirs, files in os.walk(dir_name):
@@ -879,6 +908,19 @@ def convert_reconstructions_to_ipums(dir_name,
                                      gqtype=0,
                                      break_size=500):
     """ Converts all the .csvs in `dir_name` into ipums format lines and saves the file to `save_fp`.
+
+        Other arguments:
+            hh_size (int): Size of households the person lines by block are grouped into.
+                           (eg. if a block has 12 people and hh_size = 5, 
+                            three households of size 5, 5, and 2 are created.)
+            gq (int): Group Quarters code to be added to all the household lines.
+                      A default value of 1 means that all the households are 
+                      regular households (as opposed to group quarters)
+            gqtype(int): Group Quarters code to be added to all the household lines.
+                      A default value of 0 means that all the households are 
+                      regular households (as opposed to say colleges or jails)
+            break_size(int): Number of blocks to write before a print() statement updates 
+                      on how far along the conversion has gone. A progress bar of sorts.
     """
     # read the files, and process them
     df = read_and_process_reconstructed_csvs(dir_name)
