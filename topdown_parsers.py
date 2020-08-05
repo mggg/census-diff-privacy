@@ -884,13 +884,14 @@ def read_reconstructions(dir_name):
     """
     main_df = pd.DataFrame()
     for root, dirs, files in os.walk(dir_name):
-        for file in files:
+        for i, file in enumerate(files):
+            print("Reading file {} of {}".format(i+1, len(files)))
             if file[-3:] != "csv":
                 continue
 
             curr_df = pd.read_csv(os.path.join(root, file))
-            curr_df = parse_reconstructed_geo_output(curr_df)
-            curr_df = build_enumdist_col(curr_df)
+            # curr_df = parse_reconstructed_geo_output(curr_df)
+            # curr_df = build_enumdist_col(curr_df)
 
             # duplicate the rows based on the column `sol` i.e if sol = 3 that row is
             # converted into 3 rows.
@@ -960,3 +961,19 @@ def convert_reconstructions_to_ipums(dir_name,
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
+
+def num_lines_by_type(filename):
+    """ Returns the number of Household lines and Person Lines in the file
+        named  `filename`
+    """
+    h_lines = 0
+    p_lines = 0
+
+    with open(filename, "r") as file:
+        for line in file:
+            if line[0] == "H":
+                h_lines += 1
+            elif line[0] == "P":
+                p_lines += 1
+
+    return h_lines, p_lines
