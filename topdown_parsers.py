@@ -371,12 +371,12 @@ def parse_positions_person(line):
 def left_pad_with_zeros(number, target_len):
     """ Left-pads a number with 0s until the string gets to length `target_len`.
         Eg. if number is 123 and target_len = 5, the return value is `00123`.
-        
-        Note: `number` doesn't necessarily have to be a number for the function to work. 
+
+        Note: `number` doesn't necessarily have to be a number for the function to work.
     """
     str_num = str(number)
     assert(len(str_num) <= target_len)
-    
+
     zeros_needed = target_len - len(str_num)
     prefix = ''
     for i in range(zeros_needed):
@@ -385,92 +385,86 @@ def left_pad_with_zeros(number, target_len):
     return prefix + str_num
 
 def modify_age(line, age, age_len=3, age_col="AGE"):
-    """ Changes the age value of the dictionary `line`, 
+    """ Changes the age value of the dictionary `line`,
         and returns the new updated dictionary.
     """
     line[age_col] = left_pad_with_zeros(str(age), age_len)
     return line
 
 def modify_race(line, race, race_col="RACE"):
-    """ Changes the `race` field of the dict `line` with the mapping 
-        Denis sent Bhushan of the reconstruction outputs to the RACE fields 
-        in the ipums data format here: 
-        https://usa.ipums.org/usa/resources/1940CensusDASTestData/EXT1940USCB.cbk
-        
+    """ Changes the `race` field of the dict `line`.
+        The 2018 E2E can only take 6 fields as input [1-6], and this is a
+        mapping of the reconstructed races to __arbitrary__ input values.
+
+        Importantly, multi-racial people have been labelled as other in this convention.
     """
-    # if len(race) == 2:
-    #     line[race_col] = '8'
-    # elif len(race) >= 3:
-    #     line[race_col] = '9'
-    # elif race == "w":
-    #     line[race_col] = '1'
-    # elif race == "b":
-    #     line[race_col] = '2'
-    # elif race == "i":
-    #     line[race_col] = '3'
-    # elif race == "a":
-    #    """ The reconstruction outputs only "a" for asian but there are 
-    #        more than 1 kind of asian you can be in ipums format. I have
-    #        gone for Chinese (4) to denote asian to label all the asians together.
-    #    """
-    #     line[race_col] = '4'
-    # elif race == "h":
-    #     line[race_col] = '6'
-    # elif race == "o":
-    #     line[race_col] = '7'
-    # else:
-    #     raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
-    line[race_col] = '2'
+    if race == "w":
+        line[race_col] = '1'
+    elif race == "b":
+        line[race_col] = '2'
+    elif race == "i":
+        line[race_col] = '3'
+    elif race == "a":
+        line[race_col] = '4'
+    elif race == "h":
+        line[race_col] = '5'
+    elif race == "o":
+        line[race_col] = '6'
+    elif len(race) > 2:  # multi-racial people are labeled as other.
+        line[race_col] = '6'
+    else:
+        raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
+
     return line
-    
+
 def modify_hisp(line, hisp, hisp_col="HISPAN"):
-    """ Changes the `hisp_col` value of the dictionary `line` to `hisp`, 
-        and returns the new updated dictionary. 
+    """ Changes the `hisp_col` value of the dictionary `line` to `hisp`,
+        and returns the new updated dictionary.
     """
     assert(str(hisp) in ['0', '1'])
     line[hisp_col] = str(hisp)
     return line
 
 def modify_gqtype(line, gqtype, gqtype_col="GQTYPE"):
-    """ Changes the `gqtype_col` value of the dictionary `line` to `gqtype`, 
-        and returns the new updated dictionary. 
+    """ Changes the `gqtype_col` value of the dictionary `line` to `gqtype`,
+        and returns the new updated dictionary.
     """
     assert(len(str(gqtype)) == 1)
     line[gqtype_col] = str(gqtype)
     return line
 
 def modify_gq(line, gq, gq_col="GQ"):
-    """ Changes the `gq_col` value of the dictionary `line` to `gq`, 
-        and returns the new updated dictionary. 
+    """ Changes the `gq_col` value of the dictionary `line` to `gq`,
+        and returns the new updated dictionary.
     """
     assert(len(str(gq))==1)
     line[gq_col] = str(gq)
     return line
 
 def modify_serial(line, serial, serial_len=8, serial_col="SERIAL"):
-    """ Changes the `serial_col` value of the dictionary `line` to `serial`, 
-        and returns the new updated dictionary. 
+    """ Changes the `serial_col` value of the dictionary `line` to `serial`,
+        and returns the new updated dictionary.
     """
     line[serial_col] = left_pad_with_zeros(serial, serial_len)
     return line
 
 def modify_state(line, state, state_col="STATEFIP", state_len=2):
-    """ Changes the `state_col` value of the dictionary `line` to `state`, 
-        and returns the new updated dictionary. 
+    """ Changes the `state_col` value of the dictionary `line` to `state`,
+        and returns the new updated dictionary.
     """
     line[state_col] = left_pad_with_zeros(state, state_len)
     return line
 
 def modify_county(line, county, county_col="COUNTY", county_len=3):
-    """ Changes the `county_col` value of the dictionary `line` to `county`, 
-        and returns the new updated dictionary. 
+    """ Changes the `county_col` value of the dictionary `line` to `county`,
+        and returns the new updated dictionary.
     """
     line[county_col] = left_pad_with_zeros(county, county_len)
     return line
 
 def modify_enumdist(line, enumdist, enumdist_col="ENUMDIST"):
-    """ Changes the `enumdist_col` value of the dictionary `line` to `enumdist`, 
-        and returns the new updated dictionary. 
+    """ Changes the `enumdist_col` value of the dictionary `line` to `enumdist`,
+        and returns the new updated dictionary.
     """
     line[enumdist_col] = enumdist
     return line
@@ -806,7 +800,7 @@ def convert_to_person_line_delimited(person):
     return line
 
 def build_person_line(serial, age, hisp, race):
-    """ Generates a Person line in 1940s ipums format and changes its 
+    """ Generates a Person line in 1940s ipums format and changes its
         `serial`, `age`, `hisp` and `race`.
         Returns the line.
     """
@@ -821,7 +815,7 @@ def build_person_line(serial, age, hisp, race):
     return person_line
 
 def build_hh_line(serial, gq, gqtype, state, county, enumdist):
-    """ Generates a Household line in 1940s ipums format and changes its 
+    """ Generates a Household line in 1940s ipums format and changes its
         `serial`, `gq`, `gqtype`, `state`, `county` and `enudmist`.
         Returns the line.
     """
@@ -863,9 +857,9 @@ def state_fips(state):
         return '48'
 
 def read_and_process_reconstructed_csvs(dir_name):
-    """ Reads all the .csvs in filepath `dir_name` and concats them 
+    """ Reads all the .csvs in filepath `dir_name` and concats them
         into one dataframe.
-        Proceeds to post-process the data frame to seperate state, county, 
+        Proceeds to post-process the data frame to seperate state, county,
         tract, block group and block. The tract, block group and block are
         concatenated together to form an `enumdist`.
         Also converts the state and county to their fips codes.
@@ -874,17 +868,17 @@ def read_and_process_reconstructed_csvs(dir_name):
     """
     print("Reading files...")
     df = read_reconstructions(dir_name)
-    df = parse_reconstructed_geo_output(df)           
+    df = parse_reconstructed_geo_output(df)
     df = build_enumdist_col(df)
-    
+
     df["state"] = df["state"].apply(lambda state: state_fips(state))
     df["county"] = df["county"].apply(lambda county: county_fips(county))
     print("Completed reading files")
-    
+
     return df
 
 def read_reconstructions(dir_name):
-    """ Reads all the .csvs in filepath `dir_name` and concats them 
+    """ Reads all the .csvs in filepath `dir_name` and concats them
         into one dataframe.
         Returns this dataframe.
     """
@@ -898,18 +892,18 @@ def read_reconstructions(dir_name):
             curr_df = parse_reconstructed_geo_output(curr_df)
             curr_df = build_enumdist_col(curr_df)
 
-            # duplicate the rows based on the column `sol` i.e if sol = 3 that row is 
+            # duplicate the rows based on the column `sol` i.e if sol = 3 that row is
             # converted into 3 rows.
-            curr_df = pd.DataFrame([curr_df.loc[idx] 
-                                    for idx in curr_df.index 
+            curr_df = pd.DataFrame([curr_df.loc[idx]
+                                    for idx in curr_df.index
                                     for _ in range(curr_df.loc[idx]['sol'])]).reset_index(drop=True)
 
             main_df = pd.concat([main_df, curr_df])
-            
+
     return main_df
 
 
-def convert_reconstructions_to_ipums(dir_name, 
+def convert_reconstructions_to_ipums(dir_name,
                                      save_fp,
                                      hh_size=5,
                                      gq=1,
@@ -919,15 +913,15 @@ def convert_reconstructions_to_ipums(dir_name,
 
         Other arguments:
             hh_size (int): Size of households the person lines by block are grouped into.
-                           (eg. if a block has 12 people and hh_size = 5, 
+                           (eg. if a block has 12 people and hh_size = 5,
                             three households of size 5, 5, and 2 are created.)
             gq (int): Group Quarters code to be added to all the household lines.
-                      A default value of 1 means that all the households are 
+                      A default value of 1 means that all the households are
                       regular households (as opposed to group quarters)
             gqtype(int): Group Quarters code to be added to all the household lines.
-                      A default value of 0 means that all the households are 
+                      A default value of 0 means that all the households are
                       regular households (as opposed to say colleges or jails)
-            break_size(int): Number of blocks to write before a print() statement updates 
+            break_size(int): Number of blocks to write before a print() statement updates
                       on how far along the conversion has gone. A progress bar of sorts.
     """
     # read the files, and process them
@@ -938,18 +932,18 @@ def convert_reconstructions_to_ipums(dir_name,
     print("Finished grouping the data.")
     total_written = 0
     counter = 0 # counter at a block level
-    
+
     with open(save_fp, "w+") as write_file:
         serial = 1
         for ((state, county, tract, bg, block), group) in groups:
-            
+
             counter += 1
             if counter % break_size == 0:
                 print("Writing block {} of {}.".format(counter, len(groups)))
-                
+
             block_df = df[(df["state"]==state) & (df["county"]==county) & (df["tract"]==tract) & (df["bg"]==bg) & (df["block"]==block)]
             person_lines = []
-            
+
             for (_, row) in block_df.iterrows():
                 person_line = build_person_line(serial, row["age"], row["ethn"], row["race"])
                 person_lines.append(person_line)
@@ -959,12 +953,10 @@ def convert_reconstructions_to_ipums(dir_name,
                     write_household_to_file(write_file, hh_line, person_lines)
                     serial += 1
                     person_lines = []
-            
+
             if len(person_lines) > 0:
                 # scoop up the remaining lines that are not % hh_size == 0
                 hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
-
-
