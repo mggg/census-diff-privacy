@@ -410,7 +410,7 @@ def modify_race(line, race, race_col="RACE"):
         line[race_col] = '5'
     elif race == "o":
         line[race_col] = '6'
-    elif len(race) > 2:  # multi-racial people are labeled as other.
+    elif len(race) > 1:  # multi-racial people are labeled as other.
         line[race_col] = '6'
     else:
         raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
