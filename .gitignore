@@ -2,4 +2,6 @@
 __pycache__
 toymodel/__pycache__
 *.DS_Store
-*.dat 
+*.dat
+synthetic_data_experiments/cleaned_full_county/
+synthetic_data_experiments/cleaned_synthetic/
