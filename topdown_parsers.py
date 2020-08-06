@@ -868,13 +868,22 @@ def read_and_process_reconstructed_csvs(dir_name):
     """
     print("Reading files...")
     df = read_reconstructions(dir_name)
+    print("Duplicating rows... (based on reconstructed solutions)")
+    df = duplicate_multi_solution_rows(df)
+    print("Processing Geo IDs")
     df = parse_reconstructed_geo_output(df)
     df = build_enumdist_col(df)
 
     df["state"] = df["state"].apply(lambda state: state_fips(state))
     df["county"] = df["county"].apply(lambda county: county_fips(county))
-    print("Completed reading files")
+    print("Done with reading and preparing data.")
+    return df
 
+def duplicate_multi_solution_rows(df, sol_col="sol"):
+    """ Duplicates the rows of `df` based on the value in the column `sol_col`.
+        eg. if sol = 3 that row is converted into 3 rows.
+    """
+    df = df.reindex(df.index.repeat(df[sol_col])).reset_index(drop=True)
     return df
 
 def read_reconstructions(dir_name):
@@ -884,28 +893,24 @@ def read_reconstructions(dir_name):
     """
     main_df = pd.DataFrame()
     for root, dirs, files in os.walk(dir_name):
+        print("Reading {} files".format(len(files)))
+
         for i, file in enumerate(files):
-            print("Reading file {} of {}".format(i+1, len(files)))
             if file[-3:] != "csv":
                 continue
 
             curr_df = pd.read_csv(os.path.join(root, file))
-            # curr_df = parse_reconstructed_geo_output(curr_df)
-            # curr_df = build_enumdist_col(curr_df)
-
-            # duplicate the rows based on the column `sol` i.e if sol = 3 that row is
-            # converted into 3 rows.
-            curr_df = pd.DataFrame([curr_df.loc[idx]
-                                    for idx in curr_df.index
-                                    for _ in range(curr_df.loc[idx]['sol'])]).reset_index(drop=True)
-
             main_df = pd.concat([main_df, curr_df])
+
+    # reset indexes because we have multiple files, so multiple rows with the same indices.
+    main_df = main_df.reset_index(drop=True)
 
     return main_df
 
 
 def convert_reconstructions_to_ipums(dir_name,
                                      save_fp,
+                                     serial=1,
                                      hh_size=5,
                                      gq=1,
                                      gqtype=0,
@@ -916,6 +921,10 @@ def convert_reconstructions_to_ipums(dir_name,
             hh_size (int): Size of households the person lines by block are grouped into.
                            (eg. if a block has 12 people and hh_size = 5,
                             three households of size 5, 5, and 2 are created.)
+            serial (int) : Serial number that the reconstruction lines starts with.
+                           Everyone in a household has the same serial number, and the
+                           household also contains the serial number. Each household has
+                           a unique serial number.
             gq (int): Group Quarters code to be added to all the household lines.
                       A default value of 1 means that all the households are
                       regular households (as opposed to group quarters)
@@ -924,6 +933,11 @@ def convert_reconstructions_to_ipums(dir_name,
                       regular households (as opposed to say colleges or jails)
             break_size(int): Number of blocks to write before a print() statement updates
                       on how far along the conversion has gone. A progress bar of sorts.
+
+        Returns the serial number that is (last serial number used for this dir) + 1
+        i.e this return value can safely be used as a serial number for other reconstructions outside this function.
+
+        Also returns the number of people reconstructed.
     """
     # read the files, and process them
     df = read_and_process_reconstructed_csvs(dir_name)
@@ -931,14 +945,10 @@ def convert_reconstructions_to_ipums(dir_name,
     print("Grouping the data at a block level...")
     groups = df.groupby(["state", "county", "tract", "bg", "block"])
     print("Finished grouping the data.")
-    total_written = 0
-    counter = 0 # counter at a block level
 
     with open(save_fp, "w+") as write_file:
-        serial = 1
-        for ((state, county, tract, bg, block), group) in groups:
+        for counter, ((state, county, tract, bg, block), group) in enumerate(groups):
 
-            counter += 1
             if counter % break_size == 0:
                 print("Writing block {} of {}.".format(counter, len(groups)))
 
@@ -961,6 +971,7 @@ def convert_reconstructions_to_ipums(dir_name,
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
+    return serial, len(df)
 
 def num_lines_by_type(filename):
     """ Returns the number of Household lines and Person Lines in the file
