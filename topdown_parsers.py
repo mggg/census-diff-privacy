@@ -174,18 +174,38 @@ def distribution_of_input_var(input_file, line_type,
 def parse_reconstructed_geo_output(df, geo_col="NAME"):
     """ Parses the `geo_col` column of the reconstructions in to block, block group, tract, county and state columns.
     """
-    df[["block", "bg", "tract", "county", "state"]] = df[geo_col].str.split(", ", expand=True)
-    df["block"] = df["block"].str.split(expand=True)[1]
-    df["bg"] = df["bg"].str.split(expand=True)[2]
-    df["tract"] = df["tract"].str.split(expand=True)[2]
-    df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
+    print("Splitting into geounits...")
+    df[["block", "bg", "tract", "county", "state"]] = df["NAME"].str.split(", ", expand=True)
+
+    print("Cleaning up the geounits...")
+    df["block"] = df["block"].str[6:]
+    df["bg"] = df["bg"].str[12:]
+    df["tract"] = df["tract"].str[13:]
+    df["county"] = df["county"].str[:-7]
+
+    print("Converting to fips codes and paddings them up...")
+    df["state"] = df["state"].apply(lambda state: state_fips(state))
+    df["county"] = df["county"].apply(lambda county: county_fips(county))
+    df["tract"] = df["tract"].str.replace(".", "").map(lambda x: left_pad_with_zeros(x, 6))
+    df["county"] = df["county"].map(lambda x: left_pad_with_zeros(x, 3))
+
+    print("Building Enumdist column")
+    df = build_enumdist_col(df)
+    df = build_geoid(df)
+
     return df
 
 def build_enumdist_col(df):
     """ Concatenates the tract, bg (block group) and block columns of `df` to produce an "enumdist" column.
         Returns the new dataframe.
     """
-    df["enumdist"] = df[["tract", "bg", "block"]].apply(lambda x: ''.join(x), axis=1)
+    df["enumdist"] = df["tract"] + df["bg"] + df["block"] #df[["tract", "bg", "block"]].apply(lambda x: ''.join(x), axis=1)
+    return df
+
+def build_geoid(df):
+    """ Builds and returns the geo id for `df`.
+    """
+    df["GEOID"] = df["state"] + df["county"] + df["tract"] + df["block"]
     return df
 
 def get_sample_1940_hh():
@@ -441,11 +461,11 @@ def modify_gq(line, gq, gq_col="GQ"):
     line[gq_col] = str(gq)
     return line
 
-def modify_serial(line, serial, serial_len=8, serial_col="SERIAL"):
+def modify_serial(line, serial, serial_col="SERIAL"):
     """ Changes the `serial_col` value of the dictionary `line` to `serial`,
         and returns the new updated dictionary.
     """
-    line[serial_col] = left_pad_with_zeros(serial, serial_len)
+    line[serial_col] = str(serial)
     return line
 
 def modify_state(line, state, state_col="STATEFIP", state_len=2):
@@ -611,7 +631,7 @@ def get_texas_county_fips_code_map():
         "King",
         "Kinney",
         "Kleberg",
-        "Knoxv",
+        "Knox",
         "Lamar",
         "Lamb",
         "Lampasas",
@@ -872,10 +892,7 @@ def read_and_process_reconstructed_csvs(dir_name):
     df = duplicate_multi_solution_rows(df)
     print("Processing Geo IDs")
     df = parse_reconstructed_geo_output(df)
-    df = build_enumdist_col(df)
 
-    df["state"] = df["state"].apply(lambda state: state_fips(state))
-    df["county"] = df["county"].apply(lambda county: county_fips(county))
     print("Done with reading and preparing data.")
     return df
 
@@ -891,26 +908,23 @@ def read_reconstructions(dir_name):
         into one dataframe.
         Returns this dataframe.
     """
-    main_df = pd.DataFrame()
-    for root, dirs, files in os.walk(dir_name):
-        print("Reading {} files".format(len(files)))
+    all_files = []
 
+    for root, dirs, files in os.walk(dir_name):
         for i, file in enumerate(files):
             if file[-3:] != "csv":
                 continue
 
-            curr_df = pd.read_csv(os.path.join(root, file))
-            main_df = pd.concat([main_df, curr_df])
+            curr_df = pd.read_csv(os.path.join(root, file), index_col=None, header=0)
+            all_files.append(curr_df)
 
-    # reset indexes because we have multiple files, so multiple rows with the same indices.
-    main_df = main_df.reset_index(drop=True)
+    df = pd.concat(all_files, axis=0, ignore_index=True)
 
-    return main_df
+    return df
 
 
 def convert_reconstructions_to_ipums(dir_name,
                                      save_fp,
-                                     serial=1,
                                      hh_size=5,
                                      gq=1,
                                      gqtype=0,
@@ -943,16 +957,18 @@ def convert_reconstructions_to_ipums(dir_name,
     df = read_and_process_reconstructed_csvs(dir_name)
 
     print("Grouping the data at a block level...")
-    groups = df.groupby(["state", "county", "tract", "bg", "block"])
+    groups = df.groupby(["GEOID"])
     print("Finished grouping the data.")
 
     with open(save_fp, "w+") as write_file:
-        for counter, ((state, county, tract, bg, block), group) in enumerate(groups):
+        for counter, (geoid, group) in enumerate(groups):
+            serial = int(str(geoid) + "0001") # first serial in geoid
 
             if counter % break_size == 0:
                 print("Writing block {} of {}.".format(counter, len(groups)))
 
-            block_df = df[(df["state"]==state) & (df["county"]==county) & (df["tract"]==tract) & (df["bg"]==bg) & (df["block"]==block)]
+            # block_df = df[(df["state"]==state) & (df["county"]==county) & (df["tract"]==tract) & (df["block"]==block)]
+            block_df = df[df["GEOID"] == geoid]
             person_lines = []
 
             for (_, row) in block_df.iterrows():
@@ -960,18 +976,17 @@ def convert_reconstructions_to_ipums(dir_name,
                 person_lines.append(person_line)
 
                 if (len(person_lines) == hh_size):
-                    hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
+                    hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"])
                     write_household_to_file(write_file, hh_line, person_lines)
                     serial += 1
                     person_lines = []
 
             if len(person_lines) > 0:
                 # scoop up the remaining lines that are not % hh_size == 0
-                hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
+                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"])
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
-    return serial, len(df)
 
 def num_lines_by_type(filename):
     """ Returns the number of Household lines and Person Lines in the file
