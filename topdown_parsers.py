@@ -186,8 +186,8 @@ def parse_reconstructed_geo_output(df, geo_col="NAME"):
     print("Converting to fips codes and paddings them up...")
     df["state"] = df["state"].apply(lambda state: state_fips(state))
     df["county"] = df["county"].apply(lambda county: county_fips(county))
-    df["tract"] = df["tract"].str.replace(".", "").map(lambda x: left_pad_with_zeros(x, 6))
-    df["county"] = df["county"].map(lambda x: left_pad_with_zeros(x, 3))
+    df["tract"] = df["tract"].astype(float).apply(lambda t: '{:.2f}'.format(t)).str.replace(".", "").str.pad(width=6, fillchar='0')
+    df["county"] = df["county"].str.pad(width=3, fillchar='0')
 
     print("Building Enumdist column")
     df = build_enumdist_col(df)
@@ -199,7 +199,7 @@ def build_enumdist_col(df):
     """ Concatenates the tract, bg (block group) and block columns of `df` to produce an "enumdist" column.
         Returns the new dataframe.
     """
-    df["enumdist"] = df["tract"] + df["bg"] + df["block"] #df[["tract", "bg", "block"]].apply(lambda x: ''.join(x), axis=1)
+    df["enumdist"] = df["tract"] + df["bg"] + df["block"] 
     return df
 
 def build_geoid(df):
