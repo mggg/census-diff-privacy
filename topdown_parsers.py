@@ -199,7 +199,7 @@ def build_enumdist_col(df):
     """ Concatenates the tract, bg (block group) and block columns of `df` to produce an "enumdist" column.
         Returns the new dataframe.
     """
-    df["enumdist"] = df["tract"] + df["bg"] + df["block"] 
+    df["enumdist"] = df["tract"] + df["bg"] + df["block"]
     return df
 
 def build_geoid(df):
@@ -967,7 +967,6 @@ def convert_reconstructions_to_ipums(dir_name,
             if counter % break_size == 0:
                 print("Writing block {} of {}.".format(counter, len(groups)))
 
-            # block_df = df[(df["state"]==state) & (df["county"]==county) & (df["tract"]==tract) & (df["block"]==block)]
             block_df = df[df["GEOID"] == geoid]
             person_lines = []
 
@@ -987,6 +986,72 @@ def convert_reconstructions_to_ipums(dir_name,
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
+
+def convert_reconstructions_to_ipums_same_block(dir_name,
+                                                save_fp,
+                                                hh_size=5,
+                                                gq=1,
+                                                gqtype=0,
+                                                break_size=500):
+    """
+    Converts all the .csvs in `dir_name` into ipums format lines and saves the file to `save_fp`.
+    Differs from `convert_reconstructions_to_ipums()` in that it puts all the people in `dir_name`
+    IN THE SAME BLOCK, ie it ignores the block, block group and tract assignments from the reconstructions
+    and puts the people into the same block "0001".
+
+        Other arguments:
+            hh_size (int): Size of households the person lines by block are grouped into.
+                           (eg. if a block has 12 people and hh_size = 5,
+                            three households of size 5, 5, and 2 are created.)
+            serial (int) : Serial number that the reconstruction lines starts with.
+                           Everyone in a household has the same serial number, and the
+                           household also contains the serial number. Each household has
+                           a unique serial number.
+            gq (int): Group Quarters code to be added to all the household lines.
+                      A default value of 1 means that all the households are
+                      regular households (as opposed to group quarters)
+            gqtype(int): Group Quarters code to be added to all the household lines.
+                      A default value of 0 means that all the households are
+                      regular households (as opposed to say colleges or jails)
+            break_size(int): Number of blocks to write before a print() statement updates
+                      on how far along the conversion has gone. A progress bar of sorts.
+
+        Returns the serial number that is (last serial number used for this dir) + 1
+        i.e this return value can safely be used as a serial number for other reconstructions outside this function.
+
+        Also returns the number of people reconstructed.
+    """
+    # read the files, and process them
+    df = read_and_process_reconstructed_csvs(dir_name)
+    df["enumdist"] = "99999999999"
+
+    with open(save_fp, "w+") as write_file:
+        # first serial in geoid. 7 digits because a county's pop can go up to single digit millions.
+        serial = int( df["state"].iloc[0]
+                    + df["county"].iloc[0]
+                    + df["enumdist"].iloc[0]
+                    + "0000001")
+
+        person_lines = []
+
+        for (_, row) in df.iterrows():
+            person_line = build_person_line(serial, row["age"], row["ethn"], row["race"])
+            person_lines.append(person_line)
+
+            if (len(person_lines) == hh_size):
+                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"])
+                write_household_to_file(write_file, hh_line, person_lines)
+                serial += 1
+                person_lines = []
+
+        if len(person_lines) > 0:
+            # scoop up the remaining lines that are not % hh_size == 0
+            hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"])
+            write_household_to_file(write_file, hh_line, person_lines)
+            serial += 1
+            person_lines = []
+
+
 
 def num_lines_by_type(filename):
     """ Returns the number of Household lines and Person Lines in the file
