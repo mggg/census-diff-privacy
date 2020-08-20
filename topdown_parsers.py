@@ -1030,3 +1030,66 @@ def convert_reconstructions_to_ipums(dir_name,
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
+
+def parse_hh_pipe_delimited(self,line):
+    fields = line.split('|')
+    if len(fields)!=53:
+        raise ValueError(f'expected 53 fields, found {len(fields)}')
+
+    h_dict = dict()
+
+    h_dict["RECTYPE"] = fields[0]
+    h_dict["YEAR"] = fields[1]
+    h_dict["DATANUM"] = fields[2]
+    h_dict["SERIAL"] = fields[3]
+    h_dict["NUMPREC"] = fields[4]
+    h_dict["SUBSAMP"] = fields[5]
+    h_dict["HHWT"] = fields[6]
+    h_dict["NUMPERHH"] = fields[7]
+    h_dict["HHTYPE"] = fields[8]
+    h_dict["DWELLING"] = fields[9]
+    h_dict["SLPERNUM"] = fields[10]
+    h_dict["CPI99"] = fields[11]
+    h_dict["REGION"] = fields[12]
+    h_dict["STATEICP"] = fields[13]
+    h_dict["STATEFIP"] = fields[14]
+    h_dict["COUNTY"] = fields[15]
+    h_dict["URBAN"] = fields[16]
+    h_dict["METRO"] = fields[17]
+    h_dict["METAREA"] = fields[18]
+    h_dict["METAREAD"] = fields[19]
+    h_dict["CITY"] = fields[20]
+    h_dict["CITYPOP"] = fields[21]
+    h_dict["SIZEPL"] = fields[22]
+    h_dict["URBPOP"] = fields[23]
+    h_dict["SEA"] = fields[24]
+    h_dict["WARD"] = fields[25]
+    h_dict["CNTRY"] = fields[26]
+    h_dict["GQ"] = fields[27]
+    h_dict["GQTYPE"] = fields[28]
+    h_dict["GQTYPED"] = fields[29]
+    h_dict["GQFUNDS"] = fields[30]
+    h_dict["FARM"] = fields[31]
+    h_dict["OWNERSHP"] = fields[32]
+    h_dict["OWNERSHPD"] = fields[33]
+    h_dict["RENT"] = fields[34]
+    h_dict["VALUEH"] = fields[35]
+    h_dict["NFAMS"] = fields[36]
+    h_dict["NSUBFAM"] = fields[37]
+    h_dict["NCOUPLES"] = fields[38]
+    h_dict["NMOTHERS"] = fields[39]
+    h_dict["NFATHERS"] = fields[40]
+    h_dict["MULTGEN"] = fields[41]
+    h_dict["MULTGEND"] = fields[42]
+    h_dict["ENUMDIST"] = fields[43]
+    h_dict["SUPDIST"] = fields[44]
+    h_dict["RESPOND"] = fields[45]
+    h_dict["SPLIT"] = fields[46]
+    h_dict["SPLITHID"] = fields[47]
+    h_dict["SPLITNUM"] = fields[48]
+    h_dict["SPLIT40"] = fields[49]
+    h_dict["SERIAL40"] = fields[50]
+    h_dict["NUMPREC40"] = fields[51]
+    h_dict["EDMISS"] = fields[52]
+
+    return h_dict
