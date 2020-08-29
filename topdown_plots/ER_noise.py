@@ -96,7 +96,7 @@ def point_estimates(data, cand, race, elect_col, tot_vote, eps, split, filt=True
 
 
 def plot_point_estimates(data, cand, race, elect, elect_col, tot_vote, eps, split,
-                         filt=True, n_samps=32, ax=None, title=True, x_lims=None, weight=False):
+                         filt=True, n_samps=32, ax=None, title=None, x_lims=None, weight=False):
     
     df = data.query("epsilon == @eps & split == @split")
     df = df.query("`{}` > 10".format(tot_vote)) if filt else df
@@ -114,7 +114,9 @@ def plot_point_estimates(data, cand, race, elect, elect_col, tot_vote, eps, spli
     if ax==None:
         fig = plt.figure(figsize=(8,6))
         ax = fig.add_subplot(1, 1, 1)
-    if title: ax.set_title("ER Point Estimates - Votes for {}: {}".format(cand, elect))
+    if title: 
+        # ax.set_title("ER Point Estimates - Votes for {}: {}".format(cand, elect))
+        ax.set_title(title)
 
     if x_lims: ax.set_xlim(x_lims[0],x_lims[1])
 
@@ -140,18 +142,18 @@ def plot_point_estimates(data, cand, race, elect, elect_col, tot_vote, eps, spli
     return ax
 
 def plot_point_estimate_grid(epsilon_values, epsilon_splits, data, candidate, race, election, elect_col, 
-                    tot_vote, n_samps, figsize=(10,10), filt=True, title=True, x_lims=None, weight=False):
+                    tot_vote, n_samps, figsize=(10,10), filt=True, title=None, x_lims=None, weight=False):
     
     fig, axs = plt.subplots(len(epsilon_values),len(epsilon_splits), figsize=figsize)
 
-    if title: fig.suptitle("ER - Votes for {}: {}".format(candidate, election))
+    if title: fig.suptitle(title)
     plt.subplots_adjust(hspace = 0.25)
 
     for i in range(len(epsilon_values)):
         for j in range(len(epsilon_splits)):
             plot_point_estimates(data, candidate, race, None, elect_col, tot_vote, 
                                  epsilon_values[i], epsilon_splits[j], weight=weight,
-                                 title=False, ax=axs[i,j], filt=filt, x_lims=x_lims, n_samps=n_samps)
+                                 title=None, ax=axs[i,j], filt=filt, x_lims=x_lims, n_samps=n_samps)
 
     pad = 5
     for ax, row in zip(axs[:,0], ["$\epsilon$ = {}".format(eps) for eps in epsilon_values]):
