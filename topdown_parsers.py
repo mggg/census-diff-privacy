@@ -19,7 +19,7 @@ def read_df_1940(person_file):
     df.columns = columns
     return df
 
-def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False):
+def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False, hisp=False, hisp_percent=False, vap=False):
     """ Generates and returns a DataFrame that tabulates "values" by enumdist
         for a single run.
 
@@ -29,28 +29,94 @@ def values_by_enumdist_for_run(df, state_id, race=None, race_percent=False):
         If `race_percent` is passed, the % of the race in each enumdist is
         returned.
     """
+    assert(not (hisp and race)), "Hispanic Race counts/%s are currently not supported."
+
+    # These values are from the Census 2018 E2E DAS Specs, page 10.
+    NON_HISP_VAL = 1
+    HISP_VAL = 2
+    VOTING_AGE = 18
+    NON_VOTING_AGE = 17
+
     state = df[df["TABBLKST"] == state_id]
 
-    if race and race_percent:
+    if hisp and hisp_percent:
         tot_pops = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
         tot_pops.columns = ["TABBLKST", "TABBLKCOU", "ENUMDIST", "Run"]
 
-        state['race_match'] = state.CENRACE == race
-        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['race_match'].agg([('Run', 'sum')]).reset_index()
+        if vap:
+            state["match"] = (state.CENHISP == HISP_VAL) & (state.QAGE == VOTING_AGE)
+        else:
+            state["match"] = (state.CENHISP == HISP_VAL)
+
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['match'].agg([('Run', 'sum')]).reset_index()
         values_df["Run"]  = values_df["Run"] / tot_pops["Run"]
+
+    elif hisp:
+        if vap:
+            state["match"] = (state.CENHISP == HISP_VAL) & (state.QAGE == VOTING_AGE)
+        else:
+            state["match"] = (state.CENHISP == HISP_VAL)
+
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])["match"].agg([('Run', 'sum')]).reset_index()
+
+    elif race and race_percent:
+        tot_pops = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
+        tot_pops.columns = ["TABBLKST", "TABBLKCOU", "ENUMDIST", "Run"]
+
+        if vap:
+            state['match'] = (state.CENRACE == race) & (state.CENHISP == NON_HISP_VAL) & (state.QAGE == VOTING_AGE)
+        else:
+            state['match'] = (state.CENRACE == race) & (state.CENHISP == NON_HISP_VAL)
+
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['match'].agg([('Run', 'sum')]).reset_index()
+        values_df["Run"]  = values_df["Run"] / tot_pops["Run"]
+
     elif race:
-        state['race_match'] = state.CENRACE == race
-        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['race_match'].agg([('Run', 'sum')]).reset_index()
+
+        if vap:
+            state['match'] = (state.CENRACE == race) & (state.CENHISP == NON_HISP_VAL) & (state.QAGE == VOTING_AGE)
+        else:
+            state['match'] = (state.CENRACE == race) & (state.CENHISP == NON_HISP_VAL)
+
+        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"])['match'].agg([('Run', 'sum')]).reset_index()
+
     else:
-        values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
+        if vap:
+            values_df = state[state.QAGE == VOTING_AGE].groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
+        else:
+            values_df = state.groupby(["TABBLKST", "TABBLKCOU", "ENUMDIST"]).size().reset_index()
 
     values_df.columns = ["State", "County", "Enumdist", "Run"]
     return values_df
 
+def build_county_file_from_topdown_output(dir_name,
+                                          county_fips,
+                                          person_filename,
+                                          county_filename):
+    """
+    """
+    for root, dirs, files in os.walk(dir_name):
+        for d in dirs:
+            if d[:7] == "output_":
+                path = os.path.join(root, d)
+                person_file = path + "/" + person_filename
+                out_file = path + "/" + county_filename
+
+                with open(person_file, "r") as input_file, open(out_file, "w") as write_file:
+                    for line in input_file:
+                        if line[17:20] == county_fips:
+                            write_file.write(line)
+                print("Saved County at {}".format(out_file))
+
+
 def collect_by_enumdist(dir_name,
                         state_id,
+                        filename,
                         race=None,
-                        race_percent=False):
+                        race_percent=False,
+                        hisp=False,
+                        hisp_percent=False,
+                        vap=False):
     """ Generates and returns a DataFrame that tabulates "values" by enumdist for
         all runs.
 
@@ -66,17 +132,21 @@ def collect_by_enumdist(dir_name,
 
     run = 0
     main_df = pd.DataFrame(columns=["State", "County", "Enumdist"])
+
     for root, dirs, files in os.walk(dir_name):
         for d in dirs:
             if d[:7] == "output_":
                 path = os.path.join(root, d)
-                person_file = path + "/MDF_PER_CLEAN.dat"
+                person_file = path + "/" + filename
 
                 person_df = read_df_1940(person_file)
                 values_df = values_by_enumdist_for_run(person_df,
                                                        state_id,
                                                        race,
-                                                       race_percent)
+                                                       race_percent,
+                                                       hisp,
+                                                       hisp_percent,
+                                                       vap)
 
                 run += 1
                 values_df= values_df.rename(columns={"Run": "Run_{}".format(run)})
