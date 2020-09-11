@@ -244,13 +244,37 @@ def distribution_of_input_var(input_file, line_type,
 def parse_reconstructed_geo_output(df, geo_col="NAME"):
     """ Parses the `geo_col` column of the reconstructions in to block, block group, tract, county and state columns.
     """
-    df[["block", "bg", "tract", "county", "state"]] = df[geo_col].str.split(", ", expand=True)
-    df["block"] = df["block"].str.split(expand=True)[1]
-    df["bg"] = df["bg"].str.split(expand=True)[2]
-    df["tract"] = df["tract"].str.split(expand=True)[2]
-    df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
-    return df
+    print("Splitting into geounits...")
+    df[["block", "bg", "tract", "county", "state"]] = df["NAME"].str.split(", ", expand=True)
 
+    print("Cleaning up the geounits...")
+    df["block"] = df["block"].str[6:]
+    df["bg"] = df["bg"].str[12:]
+    df["tract"] = df["tract"].str[13:]
+    df["county"] = df["county"].str[:-7]
+
+    print("Converting to fips codes and paddings them up...")
+    df["state"] = df["state"].apply(lambda state: state_fips(state))
+    df["county"] = df["county"].apply(lambda county: county_fips(county))
+    df["tract"] = df["tract"].astype(float).apply(lambda t: '{:.2f}'.format(t)).str.replace(".", "").str.pad(width=6, fillchar='0')
+    df["county"] = df["county"].str.pad(width=3, fillchar='0')
+
+    print("Building Enumdist column")
+    df = build_enumdist_col(df)
+    df = build_geoid(df)
+
+    return df
+#
+# def parse_reconstructed_geo_output(df, geo_col="NAME"):
+#     """ Parses the `geo_col` column of the reconstructions in to block, block group, tract, county and state columns.
+#     """
+#     df[["block", "bg", "tract", "county", "state"]] = df[geo_col].str.split(", ", expand=True)
+#     df["block"] = df["block"].str.split(expand=True)[1]
+#     df["bg"] = df["bg"].str.split(expand=True)[2]
+#     df["tract"] = df["tract"].str.split(expand=True)[2]
+#     df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
+#     return df
+#
 def build_enumdist_col(df):
     """ Concatenates the tract, bg (block group) and block columns of `df` to produce an "enumdist" column.
         Returns the new dataframe.
@@ -939,18 +963,16 @@ def read_and_process_reconstructed_csvs(dir_name):
         tract, block group and block. The tract, block group and block are
         concatenated together to form an `enumdist`.
         Also converts the state and county to their fips codes.
-
         Returns this df.
     """
     print("Reading files...")
     df = read_reconstructions(dir_name)
+    print("Duplicating rows... (based on reconstructed solutions)")
+    df = duplicate_multi_solution_rows(df)
+    print("Processing Geo IDs")
     df = parse_reconstructed_geo_output(df)
-    df = build_enumdist_col(df)
 
-    df["state"] = df["state"].apply(lambda state: state_fips(state))
-    df["county"] = df["county"].apply(lambda county: county_fips(county))
-    print("Completed reading files")
-
+    print("Done with reading and preparing data.")
     return df
 
 def read_reconstructions(dir_name):
@@ -958,26 +980,25 @@ def read_reconstructions(dir_name):
         into one dataframe.
         Returns this dataframe.
     """
-    main_df = pd.DataFrame()
+    all_files = []
+
     for root, dirs, files in os.walk(dir_name):
-        for file in files:
+        for i, file in enumerate(files):
             if file[-3:] != "csv":
                 continue
 
-            curr_df = pd.read_csv(os.path.join(root, file))
-            curr_df = parse_reconstructed_geo_output(curr_df)
-            curr_df = build_enumdist_col(curr_df)
+            curr_df = pd.read_csv(os.path.join(root, file), index_col=None, header=0)
+            all_files.append(curr_df)
 
-            # duplicate the rows based on the column `sol` i.e if sol = 3 that row is
-            # converted into 3 rows.
-            curr_df = pd.DataFrame([curr_df.loc[idx]
-                                    for idx in curr_df.index
-                                    for _ in range(curr_df.loc[idx]['sol'])]).reset_index(drop=True)
+    df = pd.concat(all_files, axis=0, ignore_index=True)
+    return df
 
-            main_df = pd.concat([main_df, curr_df])
-
-    return main_df
-
+def duplicate_multi_solution_rows(df, sol_col="sol"):
+    """ Duplicates the rows of `df` based on the value in the column `sol_col`.
+        eg. if sol = 3 that row is converted into 3 rows.
+    """
+    df = df.reindex(df.index.repeat(df[sol_col])).reset_index(drop=True)
+    return df
 
 def convert_reconstructions_to_ipums(dir_name,
                                      save_fp,
