@@ -264,17 +264,7 @@ def parse_reconstructed_geo_output(df, geo_col="NAME"):
     df = build_geoid(df)
 
     return df
-#
-# def parse_reconstructed_geo_output(df, geo_col="NAME"):
-#     """ Parses the `geo_col` column of the reconstructions in to block, block group, tract, county and state columns.
-#     """
-#     df[["block", "bg", "tract", "county", "state"]] = df[geo_col].str.split(", ", expand=True)
-#     df["block"] = df["block"].str.split(expand=True)[1]
-#     df["bg"] = df["bg"].str.split(expand=True)[2]
-#     df["tract"] = df["tract"].str.split(expand=True)[2]
-#     df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
-#     return df
-#
+
 def build_enumdist_col(df):
     """ Concatenates the tract, bg (block group) and block columns of `df` to produce an "enumdist" column.
         Returns the new dataframe.
@@ -711,7 +701,7 @@ def get_texas_county_fips_code_map():
         "King",
         "Kinney",
         "Kleberg",
-        "Knoxv",
+        "Knox",
         "Lamar",
         "Lamb",
         "Lampasas",
