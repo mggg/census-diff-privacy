@@ -500,7 +500,7 @@ def modify_race(line, race, race_col="RACE"):
         line[race_col] = '5'
     elif race == "o":
         line[race_col] = '6'
-    elif len(race) > 2:  # multi-racial people are labeled as other.
+    elif len(race) >= 2:  # multi-racial people are labeled as other.
         line[race_col] = '6'
     else:
         raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
@@ -889,14 +889,14 @@ def convert_to_person_line_delimited(person):
     line = line + "\n"
     return line
 
-def build_person_line(serial, age, hisp, race):
+def build_person_line(serial, age, hisp, race, serial_len=8):
     """ Generates a Person line in 1940s ipums format and changes its
         `serial`, `age`, `hisp` and `race`.
         Returns the line.
     """
     person_line = get_sample_1940_person()
     person = parse_positions_person(person_line)
-    person = modify_serial(person, serial)
+    person = modify_serial(person, serial, serial_len=serial_len)
     person = modify_age(person, age)
     person = modify_hisp(person, hisp)
     person = modify_race(person, race)
@@ -904,7 +904,7 @@ def build_person_line(serial, age, hisp, race):
     person_line = convert_to_person_line_delimited(person)
     return person_line
 
-def build_hh_line(serial, gq, gqtype, state, county, enumdist):
+def build_hh_line(serial, gq, gqtype, state, county, enumdist, serial_len=8):
     """ Generates a Household line in 1940s ipums format and changes its
         `serial`, `gq`, `gqtype`, `state`, `county` and `enudmist`.
         Returns the line.
@@ -912,7 +912,7 @@ def build_hh_line(serial, gq, gqtype, state, county, enumdist):
     sample_line = get_sample_1940_hh()
     hh = parse_positions_hh(sample_line)
 
-    hh = modify_serial(hh, serial)
+    hh = modify_serial(hh, serial, serial_len=serial_len)
     hh = modify_gq(hh, gq)
     hh = modify_gqtype(hh, gqtype)
     hh = modify_state(hh, state)
@@ -1023,6 +1023,7 @@ def convert_reconstructions_to_ipums(dir_name,
     with open(save_fp, "w+") as write_file:
         serial = 1
         for ((state, county, tract, bg, block), group) in groups:
+            geoid = state + county + tract + block
 
             counter += 1
             if counter % break_size == 0:
@@ -1159,18 +1160,18 @@ def convert_reconstructions_to_ipums_same_block(dir_name,
         person_lines = []
 
         for (_, row) in df.iterrows():
-            person_line = build_person_line(serial, row["age"], row["ethn"], row["race"])
+            person_line = build_person_line(serial, row["age"], row["ethn"], row["race"], serial_len=len(str(serial)))
             person_lines.append(person_line)
 
             if (len(person_lines) == hh_size):
-                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"])
+                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
 
         if len(person_lines) > 0:
             # scoop up the remaining lines that are not % hh_size == 0
-            hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"])
+            hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
             write_household_to_file(write_file, hh_line, person_lines)
             serial += 1
             person_lines = []
