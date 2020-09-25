@@ -130,8 +130,8 @@ def plot_point_estimates(data, cand, race, elect, elect_col, tot_vote, eps, spli
         zeros[i] = line_noised.intercept_
         ones[i] = line_noised.predict([[1]])[0]
     
-    ax.hist(zeros, color="limegreen", alpha=0.5, label="all but {} support".format(race))
-    ax.hist(ones, color="mediumpurple",  alpha=0.5, label="{} support".format(race))
+    ax.hist(zeros, color="limegreen", alpha=0.9, label="all but {} support".format(race))
+    ax.hist(ones, color="mediumpurple",  alpha=0.9, label="{} support".format(race))
     ax.axvline(zeros.mean(), color="limegreen")
     ax.axvline(ones.mean(), color="mediumpurple")
     ax.axvline(line.intercept_, color="slategrey", linestyle="dashed")
