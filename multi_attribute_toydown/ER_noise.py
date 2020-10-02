@@ -53,7 +53,7 @@ def plot_er_graph(data, cand, race, elect, elect_col, tot_vote, eps, split, filt
 
 ## Plot grid of epsilon values vs. splits for ToyDown/TopDown ER plots
 def plot_elect_grid(epsilon_values, epsilon_splits, data, candidate, race, elect_col, 
-                    tot_vote, figsize=(10,10), filt=True, title=None, weight=False):
+                    tot_vote, figsize=(10,10), filt=True, title=None, weight=False, n_samps=32):
     
     fig, axs = plt.subplots(len(epsilon_values),len(epsilon_splits), figsize=figsize)
 
@@ -64,7 +64,7 @@ def plot_elect_grid(epsilon_values, epsilon_splits, data, candidate, race, elect
         for j in range(len(epsilon_splits)):
             plot_er_graph(data, candidate, race, None, elect_col, tot_vote, 
                           epsilon_values[i], epsilon_splits[j], 
-                          title=False, ax=axs[i,j], filt=filt, weight=weight)
+                          title=False, ax=axs[i,j], filt=filt, weight=weight, n_samps=n_samps)
 
     pad = 5
     for ax, row in zip(axs[:,0], ["$\epsilon$ = {}".format(eps) for eps in epsilon_values]):
@@ -140,7 +140,7 @@ def plot_point_estimates(data, cand, race, elect, elect_col, tot_vote, eps, spli
     return ax
 
 def plot_point_estimate_grid(epsilon_values, epsilon_splits, data, candidate, race, elect_col, 
-                    tot_vote, figsize=(10,10), filt=True, title=True, x_lims=None, weight=False):
+                    tot_vote, figsize=(10,10), filt=True, title=True, x_lims=None, weight=False, n_samps=32):
     
     fig, axs = plt.subplots(len(epsilon_values),len(epsilon_splits), figsize=figsize)
 
@@ -151,7 +151,7 @@ def plot_point_estimate_grid(epsilon_values, epsilon_splits, data, candidate, ra
         for j in range(len(epsilon_splits)):
             plot_point_estimates(data, candidate, race, None, elect_col, tot_vote, 
                                  epsilon_values[i], epsilon_splits[j], weight=weight,
-                                 title=False, ax=axs[i,j], filt=filt, x_lims=x_lims)
+                                 title=False, ax=axs[i,j], filt=filt, x_lims=x_lims, n_samps=n_samps)
 
     pad = 5
     for ax, row in zip(axs[:,0], ["$\epsilon$ = {}".format(eps) for eps in epsilon_values]):
@@ -211,7 +211,7 @@ def plot_er_graph_gaussian_noise(data, cand, race, elect, tot_vote, sigma,
 
 def plot_elect_grid_gaussian_noise(epsilon_values, epsilon_splits, data, candidate, race, election, 
                                    tot_vote, sigma_matches, allow_neg=False, figsize=(10,10), filt=True, 
-                                   title=None, weight=False):
+                                   title=None, weight=False, n_samps=32):
     
     fig, axs = plt.subplots(len(epsilon_values),len(epsilon_splits), figsize=figsize)
 
@@ -224,7 +224,7 @@ def plot_elect_grid_gaussian_noise(epsilon_values, epsilon_splits, data, candida
             split = epsilon_splits[j]
             sigma = sigma_matches.query("allow_neg == @allow_neg and eps == @eps and split == @split").sigma
             plot_er_graph_gaussian_noise(data, candidate, race, election, tot_vote, 
-                                         sigma, title=False, ax=axs[i,j], filt=filt, weight=weight)
+                                         sigma, title=False, ax=axs[i,j], filt=filt, weight=weight, n_samps=n_samps)
             axs[i,j].set_title("$\sigma$ = {}".format(round(float(sigma), 2)))
 
     pad = 5
