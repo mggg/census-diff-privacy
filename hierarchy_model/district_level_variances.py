@@ -31,7 +31,8 @@ def district_frag_scores(h, districts):
     frag_scores = np.zeros(num_districts)
     for i in tqdm(range(num_districts)):
         frag_scores[i] = h.assign_district_tree_variance(districts[i], eps=1, 
-                                                         eps_splits=[np.sqrt(2)]*5)
+                                                         eps_splits=[np.sqrt(2)]*5,
+                                                         sensitivity=1)
     return frag_scores
 
 

@@ -85,7 +85,7 @@ class Hierarchy_2D:
         
         return (part, mapping)
 
-    def assign_district_tree_variance(self, district, eps=None, eps_splits=None):
+    def assign_district_tree_variance(self, district, eps=None, eps_splits=None, sensitivity=2):
         self.tree.assign_district_to_leaves(district)
         root = self.tree.get_node(self.tree.root)
         self.tree.assign_weights(root)
@@ -94,7 +94,7 @@ class Hierarchy_2D:
         if eps != None:
             epsilons *= eps if eps_splits else eps*(1/np.sqrt(2))*(1/self.levels)
             
-        return self.tree.district_variance(root, epsilons)
+        return self.tree.district_variance(root, epsilons, sensitivity)
 
     @staticmethod
     def grow_districts(graph, pop_col, pop_targets, total_pop, epsilon):
@@ -189,7 +189,7 @@ class Hierarchy_2D:
             return node.data.weight
 
 
-        def district_variance(self, node, epsilons):
+        def district_variance(self, node, epsilons, sensitivity):
             eps_k = epsilons[0]
             if node.is_leaf():
                 child_vars = []
@@ -198,10 +198,10 @@ class Hierarchy_2D:
                 child_vars = [self.district_variance(child, epsilons[1:]) for child in children]
 
             if node.data.parent == None: 
-                return node.data.weight**2 * (8/(eps_k**2)) + sum(child_vars)
+                return node.data.weight**2 * 2*(sensitivity/eps_k)**2 + sum(child_vars)
             else:
                 par_weight = self.get_node(node.data.parent).data.weight
-                return (node.data.weight - par_weight)**2 *(8/(eps_k**2)) + sum(child_vars)
+                return (node.data.weight - par_weight)**2 * 2*(sensitivity/eps_k)**2 + sum(child_vars)
 
 
 
