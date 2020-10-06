@@ -21,7 +21,7 @@ class GeoUnit(object):
         else:
             self.identifier = name
 
-class ToyModel(Tree):
+class ToyDown(Tree):
     def __init__(self, hierarchy, eps_budget, eps_splits):
         """ Initializes the Tree and populates it.
 
@@ -36,7 +36,7 @@ class ToyModel(Tree):
                          eg. if the hierarchy is [Country, State, County, District] then
                          the eps_splits could look like [0, 0.33, 0.33, 0.34]
         """
-        super(ToyModel, self).__init__()
+        super(ToyDown, self).__init__()
         self.eps_budget = eps_budget
 
         # create nodes and populate the tree
@@ -48,7 +48,7 @@ class ToyModel(Tree):
 
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
-      
+
 
     def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
         """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
@@ -107,7 +107,7 @@ class ToyModel(Tree):
             adds no noise.
         """
         assert(epsilon > 0)
-        
+
         noise = np.random.laplace(loc=0, scale=1/epsilon)
 
         node.data.noised_pop = node.data.unnoised_pop + noise
