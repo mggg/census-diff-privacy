@@ -23,7 +23,7 @@ class ToyDown(Tree):
         geounits = self.create_tree_geounits_from_leaves(parental_offsets)
         self.populate_tree(geounits)
         self.add_levels_to_node(self.get_node(self.root), 0)
-        self.print_unnoised_totaling_errors(self.get_node(self.root))
+        self.flag_unnoised_totaling_errors(self.get_node(self.root))
 
     def set_noising_params(self, eps_budget, eps_splits, sensitivity=2):
         """
@@ -175,7 +175,7 @@ class ToyDown(Tree):
         """
         root = self.get_node(self.root)
         self.__noise_and_adjust_children(root)
-        self.print_adjusted_totaling_errors(root)
+        self.flag_adjusted_totaling_errors(root)
 
     def __noise_and_adjust_children(self, node):
         """ Recursively noises children and then "adjusts" the children to sum
@@ -199,11 +199,14 @@ class ToyDown(Tree):
         for child in self.children(node.identifier):
             self.__noise_and_adjust_children(child)
 
-    def print_adjusted_totaling_errors(self, node, abs_tol=0.00005):
+    def flag_adjusted_totaling_errors(self, node, abs_tol=0.00005):
         """
             Prints the node's name if the ".adjusted_pop" attribute of the
             node's children does not sum up to it's own ".adjusted_pop" upto
             a precision of `abs_tol`.
+
+            This function exists as a check -- sometimes with deep hierarchies
+            some floating point issues have emerged.
         """
         if node.is_leaf():
             return
@@ -219,11 +222,14 @@ class ToyDown(Tree):
             for child in self.children(node.identifier):
                 self.print_adjusted_totaling_errors(child)
 
-    def print_unnoised_totaling_errors(self, node, abs_tol=0.00005):
+    def flag_unnoised_totaling_errors(self, node, abs_tol=0.00005):
         """
             Prints the node's name if the ".unnoised_pop" attribute of the
             node's children does not sum up to it's own ".unnoised_pop" upto
             a precision of `abs_tol`.
+
+            This function exists as a check -- sometimes with deep hierarchies
+            some floating point issues have emerged.
         """
         if node.is_leaf():
             return
