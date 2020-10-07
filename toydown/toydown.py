@@ -24,11 +24,12 @@ class ToyDown(Tree):
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.print_unnoised_totaling_errors(self.get_node(self.root))
 
-    def set_eps_budget_and_splits(self, eps_budget, eps_splits):
+    def set_noising_params(self, eps_budget, eps_splits, sensitivity=2):
         """
         """
         self.eps_budget = eps_budget
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
+        self.sensitivity = sensitivity
 
     # def from_hierarchy(self, hierarchy, eps_budget, eps_splits):
     #     """ Initializes the Tree and populates it.
@@ -158,7 +159,7 @@ class ToyDown(Tree):
         """
         assert(epsilon > 0)
 
-        noise = np.random.laplace(loc=0, scale=1/epsilon)
+        noise = np.random.laplace(loc=0, scale=self.sensitivity/epsilon)
 
         node.data.noised_pop = node.data.unnoised_pop + noise
         node.data.noise = noise
