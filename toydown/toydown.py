@@ -3,6 +3,7 @@ from errors import SumError
 import numpy as np
 import math
 import geopandas as gpd
+import pandas as pd
 # from gerrychain import Graph, Partition
 
 class ToyDown(Tree):
@@ -31,32 +32,6 @@ class ToyDown(Tree):
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
         self.sensitivity = sensitivity
 
-    # def from_hierarchy(self, hierarchy, eps_budget, eps_splits):
-    #     """ Initializes the Tree and populates it.
-    #
-    #         hierarchy  : List of tuples of the form (name, branching, population) sorted
-    #                      in decreasing order of geographic nesting for eg.
-    #                      [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
-    #                      has 1 Country of population 810, 3 States of population 270 each,
-    #                      3 Counties in each State of population 90 each and 3 Dists in each County of
-    #                      population 30 each.
-    #         eps_budget : Float, Epsilon budget across all levels
-    #         eps_splits : List denoting the % of splits in epsilon value by level
-    #                      eg. if the hierarchy is [Country, State, County, District] then
-    #                      the eps_splits could look like [0, 0.33, 0.33, 0.34]
-    #     """
-    #     super(ToyDown, self).__init__()
-
-        # self.eps_budget = eps_budget
-        # self.eps_values = self.epsilon_values(eps_splits, eps_budget)
-
-        # create nodes and populate the tree
-        # geounits = []
-        # self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
-        # self.populate_tree(geounits)
-        # self.print_unnoised_totaling_errors(self.get_node(self.root))
-        # self.add_levels_to_node(self.get_node(self.root), 0)
-
     def create_tree_geounits_from_leaves(self, parental_offsets):
         """
         """
@@ -81,6 +56,29 @@ class ToyDown(Tree):
 
         return geounits
 
+    def get_leaf_properties(self, property_name):
+        """
+        """
+        root = self.get_node(self.root)
+        geoids = []
+        properties = []
+
+        self.__get_leaf_property(root, property_name, geoids, properties)
+
+        properties_df = pd.DataFrame({"GEOID": geoids,
+                                      property_name: properties})
+        return properties_df
+
+    def __get_leaf_property(self, node, property_name, geoids, properties):
+        """
+        """
+        if node.is_leaf():
+            geoids.append(node.identifier)
+            properties.append(node.data.__dict__[property_name])
+        else:
+            for child in self.children(node.identifier):
+                self.__get_leaf_property(child, property_name, geoids, properties)
+
     class GeoUnit(object):
         """ This class stores the data inside each Node in the tree.
         """
@@ -100,35 +98,6 @@ class ToyDown(Tree):
             name = self.__class__.__name__
             kwargs = [ "{}={}".format(k, v) for k, v in self.__dict__.items()]
             return "%s(%s)" % (name, ", ".join(kwargs))
-
-    def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
-        """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
-
-            Args:
-                hierarchy : List of tuples of the form (name, branching, population) sorted
-                            in decreasing order of geographic nesting for eg.
-                            [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
-                            has 1 Country of population 810, 3 States of population 270 each,
-                            3 Counties in each State of population 90 each and 3 Dists in each County of
-                            population 30 each.
-                level     : Int, index of the `hierarchy` we are currently at
-                parent    : Name of the parent of the GeoUnits we are building
-                all_units : List of GeoUnits that stores all the GeoUnits built in this recursive function.
-
-        """
-        if level == len(hierarchy):
-            return
-        if level == 0:
-            # build root
-            name, branching, pop = hierarchy[level]
-            all_units.append(self.GeoUnit(name, None, pop))
-            self.add_geounits_at_level_to_list(hierarchy, level+1, name, all_units)
-        else:
-            name, branching, pop = hierarchy[level]
-            for i in range(branching):
-                curr_name = parent + name + str(i+1)
-                all_units.append(self.GeoUnit(curr_name, parent, pop))
-                self.add_geounits_at_level_to_list(hierarchy, level+1, curr_name, all_units)
 
     def epsilon_values(self, eps_splits, eps_budget):
         """ Stores the epsilon values as a List of Floats.
@@ -154,8 +123,8 @@ class ToyDown(Tree):
 
 
     def add_laplacian_noise(self, node, epsilon):
-        """ Adds Laplacian noise of parameter 1/`epsilon` to Node `node`. If `epsilon` is 0,
-            adds no noise.
+        """ Adds Laplacian noise of parameter self.sensitivity/`epsilon`
+            to Node `node`.
         """
         assert(epsilon > 0)
 
@@ -315,3 +284,58 @@ class ToyDown(Tree):
         else:
             par_weight = self.get_node(node.data.parent).data.weight
             return (node.data.weight - par_weight)**2 * 2*(sensitivity/eps_k)**2 + sum(child_vars)
+
+# def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
+#     """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
+#
+#         Args:
+#             hierarchy : List of tuples of the form (name, branching, population) sorted
+#                         in decreasing order of geographic nesting for eg.
+#                         [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
+#                         has 1 Country of population 810, 3 States of population 270 each,
+#                         3 Counties in each State of population 90 each and 3 Dists in each County of
+#                         population 30 each.
+#             level     : Int, index of the `hierarchy` we are currently at
+#             parent    : Name of the parent of the GeoUnits we are building
+#             all_units : List of GeoUnits that stores all the GeoUnits built in this recursive function.
+#
+#     """
+#     if level == len(hierarchy):
+#         return
+#     if level == 0:
+#         # build root
+#         name, branching, pop = hierarchy[level]
+#         all_units.append(self.GeoUnit(name, None, pop))
+#         self.add_geounits_at_level_to_list(hierarchy, level+1, name, all_units)
+#     else:
+#         name, branching, pop = hierarchy[level]
+#         for i in range(branching):
+#             curr_name = parent + name + str(i+1)
+#             all_units.append(self.GeoUnit(curr_name, parent, pop))
+#             self.add_geounits_at_level_to_list(hierarchy, level+1, curr_name, all_units)
+
+# def from_hierarchy(self, hierarchy, eps_budget, eps_splits):
+#     """ Initializes the Tree and populates it.
+#
+#         hierarchy  : List of tuples of the form (name, branching, population) sorted
+#                      in decreasing order of geographic nesting for eg.
+#                      [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
+#                      has 1 Country of population 810, 3 States of population 270 each,
+#                      3 Counties in each State of population 90 each and 3 Dists in each County of
+#                      population 30 each.
+#         eps_budget : Float, Epsilon budget across all levels
+#         eps_splits : List denoting the % of splits in epsilon value by level
+#                      eg. if the hierarchy is [Country, State, County, District] then
+#                      the eps_splits could look like [0, 0.33, 0.33, 0.34]
+#     """
+#     super(ToyDown, self).__init__()
+
+    # self.eps_budget = eps_budget
+    # self.eps_values = self.epsilon_values(eps_splits, eps_budget)
+
+    # create nodes and populate the tree
+    # geounits = []
+    # self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
+    # self.populate_tree(geounits)
+    # self.print_unnoised_totaling_errors(self.get_node(self.root))
+    # self.add_levels_to_node(self.get_node(self.root), 0)
