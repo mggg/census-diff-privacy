@@ -6,6 +6,7 @@ import geopandas as gpd
 # from gerrychain import Graph, Partition
 
 class ToyDown(Tree):
+
     def __init__(self, filename, geoid_col, pop_col, parental_offsets=[3, 1, 6, 3, 2]):
         """
         """
@@ -21,10 +22,15 @@ class ToyDown(Tree):
         geounits = self.create_tree_geounits_from_leaves(parental_offsets)
         self.populate_tree(geounits)
         self.add_levels_to_node(self.get_node(self.root), 0)
-
         self.print_unnoised_totaling_errors(self.get_node(self.root))
 
-    # def from_hierarchy(cls, hierarchy, eps_budget, eps_splits):
+    def set_eps_budget_and_splits(self, eps_budget, eps_splits):
+        """
+        """
+        self.eps_budget = eps_budget
+        self.eps_values = self.epsilon_values(eps_splits, eps_budget)
+
+    # def from_hierarchy(self, hierarchy, eps_budget, eps_splits):
     #     """ Initializes the Tree and populates it.
     #
     #         hierarchy  : List of tuples of the form (name, branching, population) sorted
@@ -39,16 +45,16 @@ class ToyDown(Tree):
     #                      the eps_splits could look like [0, 0.33, 0.33, 0.34]
     #     """
     #     super(ToyDown, self).__init__()
-    #
-    #     self.eps_budget = eps_budget
-    #     self.eps_values = self.epsilon_values(eps_splits, eps_budget)
-    #
-    #     # create nodes and populate the tree
-    #     geounits = []
-    #     self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
-    #     self.populate_tree(geounits)
-    #     self.print_unnoised_totaling_errors(self.get_node(self.root))
-    #     self.add_levels_to_node(self.get_node(self.root), 0)
+
+        # self.eps_budget = eps_budget
+        # self.eps_values = self.epsilon_values(eps_splits, eps_budget)
+
+        # create nodes and populate the tree
+        # geounits = []
+        # self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
+        # self.populate_tree(geounits)
+        # self.print_unnoised_totaling_errors(self.get_node(self.root))
+        # self.add_levels_to_node(self.get_node(self.root), 0)
 
     def create_tree_geounits_from_leaves(self, parental_offsets):
         """
@@ -235,8 +241,6 @@ class ToyDown(Tree):
             children_total = sum([child.data.adjusted_pop for child in self.children(node.identifier)])
 
             if not math.isclose(node.data.adjusted_pop, children_total, abs_tol=abs_tol):
-                # print("Expected ", node.data.adjusted_pop, " but the children totaled to ",
-                #       children_total, " for node ", node.tag)
                 raise SumError("Expected {} but the children totaled " \
                                "to {} for node {}".format(node.data.adjusted_pop,
                                                           children_total,
@@ -298,7 +302,7 @@ class ToyDown(Tree):
         """
         """
         eps_k = epsilons[0]
-        
+
         if node.is_leaf():
             child_vars = []
         else:
