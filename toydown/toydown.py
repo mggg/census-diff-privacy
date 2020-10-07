@@ -220,7 +220,7 @@ class ToyDown(Tree):
                                                           node.tag))
 
             for child in self.children(node.identifier):
-                self.print_adjusted_totaling_errors(child)
+                self.flag_adjusted_totaling_errors(child)
 
     def flag_unnoised_totaling_errors(self, node, abs_tol=0.00005):
         """
@@ -243,14 +243,13 @@ class ToyDown(Tree):
                                                           node.tag))
 
             for child in self.children(node.identifier):
-                self.print_unnoised_totaling_errors(child)
+                self.flag_unnoised_totaling_errors(child)
 
     def assign_district_tree_variance(self, district, eps=None, eps_splits=None, sensitivity=2):
         """
         """
         self.assign_district_to_leaves(district)
         root = self.get_node(self.root)
-        print(root)
         self.assign_weights(root)
 
         epsilons = np.ones(self.levels)*np.sqrt(2) if eps_splits == None else np.array(eps_splits)
@@ -343,5 +342,5 @@ class ToyDown(Tree):
     # geounits = []
     # self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
     # self.populate_tree(geounits)
-    # self.print_unnoised_totaling_errors(self.get_node(self.root))
+    # self.flag_unnoised_totaling_errors(self.get_node(self.root))
     # self.add_levels_to_node(self.get_node(self.root), 0)
