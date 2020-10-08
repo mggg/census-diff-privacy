@@ -25,18 +25,20 @@ class ToyDown(Tree):
         self.add_levels_to_node(self.get_node(self.root), 0)
         self.flag_unnoised_totaling_errors(self.get_node(self.root))
 
-    def set_noising_params(self, eps_budget, eps_splits, sensitivity=2):
-        """
+    def set_noising_params(self, eps_budget, eps_splits, sensitivity):
+        """ Sets the `eps_budget`, `eps_splits` and `sensitivity` parameters.
+            This function needs to be called before noising runs can be done.
         """
         self.eps_budget = eps_budget
         self.eps_values = self.epsilon_values(eps_splits, eps_budget)
         self.sensitivity = sensitivity
 
     def create_tree_geounits_from_leaves(self, parental_offsets):
+        """ Returns a list of GeoUnits of the entire tree, across the entire
+            hierarchy.
         """
-        """
-        fliped_offsets = np.flip(parental_offsets)
-        ls = np.cumsum(fliped_offsets)
+        flipped_offsets = np.flip(parental_offsets)
+        ls = np.cumsum(flipped_offsets)
 
         leafs = self.gdf[[self.leaf_id, self.pop_col]]
         nodes = self.gdf[[self.leaf_id, self.pop_col]]
@@ -50,14 +52,16 @@ class ToyDown(Tree):
         geounits = []
         for k ,v in node_dict.items():
             i, = np.where(ls == len(k))[0]
-            par = k[:-fliped_offsets[i]]
+            par = k[:-flipped_offsets[i]]
             if par == "": par = None
             geounits.insert(0, self.GeoUnit(k, par, v[self.pop_col]))
 
         return geounits
 
     def get_leaf_properties(self, property_name):
-        """
+        """ Returns a Pandas DataFrame that has two columns: a GEOID column for
+            each leaf in the tree, and a corresponding `property_name` column
+            for the property in each leaf that has `property_name` as the key.
         """
         root = self.get_node(self.root)
         geoids = []
@@ -70,7 +74,10 @@ class ToyDown(Tree):
         return properties_df
 
     def __get_leaf_property(self, node, property_name, geoids, properties):
-        """
+        """ Appends the GEOID and `property_name` property of a node in to the
+            `geoids` and `properties` arrays respectively if `node` is a leaf
+            of the tree. If `node` is not a leaf, traverses to the children of
+            the node.
         """
         if node.is_leaf():
             geoids.append(node.identifier)
@@ -120,7 +127,6 @@ class ToyDown(Tree):
             else:
                 # root node
                 self.create_node(unit.name, unit.identifier, data=unit)
-
 
     def add_laplacian_noise(self, node, epsilon):
         """ Adds Laplacian noise of parameter self.sensitivity/`epsilon`
@@ -245,8 +251,17 @@ class ToyDown(Tree):
             for child in self.children(node.identifier):
                 self.flag_unnoised_totaling_errors(child)
 
-    def assign_district_tree_variance(self, district, eps=None, eps_splits=None, sensitivity=2):
-        """
+    def assign_district_tree_variance(self, district, sensitivity, eps=None, eps_splits=None):
+        """ Assigns the assignment dict `district`  to the tree and returns the
+            analytical variance of the tree.
+
+            Args:
+                district: Dict with GEOID as key and value as the district assignment
+                sensitivity: Scaling parameter for variance
+                eps: Int , Epsilon budget
+                esp_splits: Int array of epsilon budget splits in the hierarchy,
+                            with the first value corresponding to the root of the
+                            tree.
         """
         self.assign_district_to_leaves(district)
         root = self.get_node(self.root)
@@ -259,13 +274,21 @@ class ToyDown(Tree):
         return self.district_variance(root, epsilons, sensitivity)
 
     def assign_district_to_leaves(self, district):
-        """
+        """ Assigns the assignment dict `district` to the leaves of the tree.
+            Args:
+                district: Dict with GEOID as key and value as the district assignment
+                          It is assumed that the GEOID key is the identifier of
+                          the nodes. The values are 1 if the node is in the district
+                          and 0 otherwise.
         """
         for leaf, weight in district.items():
             self.get_node(leaf).data.weight = weight
 
     def assign_weights(self, node):
-        """
+        """ Assigns the `node` its analytical variance. Returns the node's weight
+            if `node` is a leaf. Assumes that all leaves already have a .weight
+            attribute, which is set by calling the assign_district_to_leaves()
+            function before calling this function.
         """
         if not node.is_leaf():
             children = self.children(node.identifier)
@@ -274,7 +297,9 @@ class ToyDown(Tree):
         return node.data.weight
 
     def district_variance(self, node, epsilons, sensitivity):
-        """
+        """ Returns the analytical variance of `node`. `epsilons` is an array of
+            epsilon values used in the tree, of len(hierarchy).
+            `sensitivity` is a scaling parameter.
         """
         eps_k = epsilons[0]
 
@@ -289,58 +314,3 @@ class ToyDown(Tree):
         else:
             par_weight = self.get_node(node.data.parent).data.weight
             return (node.data.weight - par_weight)**2 * 2*(sensitivity/eps_k)**2 + sum(child_vars)
-
-# def add_geounits_at_level_to_list(self, hierarchy, level, parent, all_units):
-#     """ Recursively create the list of geounits needed to build the tree as specified in the `hierarchy`.
-#
-#         Args:
-#             hierarchy : List of tuples of the form (name, branching, population) sorted
-#                         in decreasing order of geographic nesting for eg.
-#                         [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
-#                         has 1 Country of population 810, 3 States of population 270 each,
-#                         3 Counties in each State of population 90 each and 3 Dists in each County of
-#                         population 30 each.
-#             level     : Int, index of the `hierarchy` we are currently at
-#             parent    : Name of the parent of the GeoUnits we are building
-#             all_units : List of GeoUnits that stores all the GeoUnits built in this recursive function.
-#
-#     """
-#     if level == len(hierarchy):
-#         return
-#     if level == 0:
-#         # build root
-#         name, branching, pop = hierarchy[level]
-#         all_units.append(self.GeoUnit(name, None, pop))
-#         self.add_geounits_at_level_to_list(hierarchy, level+1, name, all_units)
-#     else:
-#         name, branching, pop = hierarchy[level]
-#         for i in range(branching):
-#             curr_name = parent + name + str(i+1)
-#             all_units.append(self.GeoUnit(curr_name, parent, pop))
-#             self.add_geounits_at_level_to_list(hierarchy, level+1, curr_name, all_units)
-
-# def from_hierarchy(self, hierarchy, eps_budget, eps_splits):
-#     """ Initializes the Tree and populates it.
-#
-#         hierarchy  : List of tuples of the form (name, branching, population) sorted
-#                      in decreasing order of geographic nesting for eg.
-#                      [("Country", 1, 810), ("State", 3, 270), ("County", 3, 90), ("Dist", 3, 30)]
-#                      has 1 Country of population 810, 3 States of population 270 each,
-#                      3 Counties in each State of population 90 each and 3 Dists in each County of
-#                      population 30 each.
-#         eps_budget : Float, Epsilon budget across all levels
-#         eps_splits : List denoting the % of splits in epsilon value by level
-#                      eg. if the hierarchy is [Country, State, County, District] then
-#                      the eps_splits could look like [0, 0.33, 0.33, 0.34]
-#     """
-#     super(ToyDown, self).__init__()
-
-    # self.eps_budget = eps_budget
-    # self.eps_values = self.epsilon_values(eps_splits, eps_budget)
-
-    # create nodes and populate the tree
-    # geounits = []
-    # self.add_geounits_at_level_to_list(hierarchy, 0, None, geounits)
-    # self.populate_tree(geounits)
-    # self.flag_unnoised_totaling_errors(self.get_node(self.root))
-    # self.add_levels_to_node(self.get_node(self.root), 0)
