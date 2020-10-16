@@ -195,7 +195,7 @@ class Hierarchy_2D:
                 child_vars = []
             else:
                 children = self.children(node.identifier)
-                child_vars = [self.district_variance(child, epsilons[1:]) for child in children]
+                child_vars = [self.district_variance(child, epsilons[1:], sensitivity=sensitivity) for child in children]
 
             if node.data.parent == None: 
                 return node.data.weight**2 * 2*(sensitivity/eps_k)**2 + sum(child_vars)
