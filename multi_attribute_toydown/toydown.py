@@ -31,7 +31,7 @@ class GeoUnit(object):
 
 
 class ToyDown(Tree):
-    def __init__(self, geounits, num_levels, eps_budget, eps_splits, gurobi=False, pop_vap=True):
+    def __init__(self, geounits, num_levels, eps_budget, eps_splits, gurobi=False, pop_vap=True, sensitivity=2):
         """ Initializes the Tree and populates it.
             geounits   : List of GeoUnits that will form the nodes of the Tree.
             num_levels : The height of the tree
@@ -48,6 +48,7 @@ class ToyDown(Tree):
         self.eps_values = self.epsilon_values(num_levels, eps_splits, eps_budget)
         self.gurobi = gurobi
         self.pop_vap = pop_vap
+        self.sensitivity = sensitivity
 
     def epsilon_values(self, num_levels, eps_splits, eps_budget):
         """ Stores the epsilon values as a List of Floats.
@@ -85,13 +86,13 @@ class ToyDown(Tree):
              
              for k, v in node.data.attributes.items():
                 shape = v.shape
-                noise = np.random.laplace(scale=1/epsilon, size=shape)
+                noise = np.random.laplace(scale=self.sensitivity/epsilon, size=shape)
                 node.data.noise[k] = noise
                 node.data.noised[k] = v + noise
 
         else:
             shape = node.data.attributes.shape
-            noise = np.random.laplace(scale=1/epsilon, size=shape)
+            noise = np.random.laplace(scale=self.sensitivity/epsilon, size=shape)
             node.data.noised = node.data.attributes + noise
             node.data.noise = noise
         
@@ -267,8 +268,8 @@ class ToyDown(Tree):
         obj = gp.quicksum(exps)
         m.setObjective(obj, GRB.MINIMIZE)
 
-        m.addConstrs((x[i,0] == gp.quicksum([x[i,j] for j in range(1, num_cols)]) for i in range(num_rows)), 
-                         name='node_cons')
+        # m.addConstrs((x[i,0] == gp.quicksum([x[i,j] for j in range(1, num_cols)]) for i in range(num_rows)), 
+        #                  name='node_cons')
 
         if pop_vap:
             m.addConstrs((x[pop_indexs[0], j] >= x[pop_indexs[1], j] for j in range(1, num_cols)), 
@@ -323,9 +324,9 @@ class ToyDown(Tree):
         obj = gp.quicksum(exps)
         m.setObjective(obj, GRB.MINIMIZE)
 
-        m.addConstrs((xs[c,i,0] == gp.quicksum([xs[c,i,j] for j in range(1, num_cols)]) for i in range(num_rows)
-                                                                                        for c in range(num_children)), 
-                     name='node_cons')
+        # m.addConstrs((xs[c,i,0] == gp.quicksum([xs[c,i,j] for j in range(1, num_cols)]) for i in range(num_rows)
+        #                                                                                 for c in range(num_children)), 
+        #              name='node_cons')
 
         if parental_equality:
             m.addConstrs((par_adjusted[i,j] == gp.quicksum([xs[c,i,j] for c in range(num_children)]) for j in range(num_cols)
