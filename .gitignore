@@ -1,7 +1,8 @@
-.ipynb_checkpoints/
-__pycache__
-toymodel/__pycache__
+*.ipynb_checkpoints/
+*__pycache__
 *.DS_Store
 *.dat
+*.zip
 synthetic_data_experiments/cleaned_full_county/
 synthetic_data_experiments/cleaned_synthetic/
+
