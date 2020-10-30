@@ -14,7 +14,8 @@ import seaborn as sns
 from tqdm import tqdm, trange
 
 
-h = Hierarchy_2D("../../data/dallas_county_blocks/dallas_county_blocks10.shp", "GEOID10", "TOTPOP10")
+with open("data/dallas_hierarcy.p", "rb") as fin:
+    h = pickle.load(fin)
 
 epsilon_split = {"equal": [0.2,0.2,0.2,0.2,0.2], 
                  "top_heavy": [1/2, 1/4, 1/12, 1/12, 1/12],
@@ -106,22 +107,34 @@ def district_data_frame(frag_scores, model_variances, district_type):
     return results
 
 
-tract_recom = np.load("sample_districts/100_recom_tract_parts_comp.npy", allow_pickle=True)[0]["dicts"]
-block_recom = np.load("sample_districts/100_recom_block_parts_comp.npy", allow_pickle=True)[0]["dicts"]
-block_bb = np.load("sample_districts/400_squre_block_dists.npy", allow_pickle=True)[0]["dicts"]
-tract_discon = np.load("sample_districts/400_discon_tracts.npy", allow_pickle=True)
-block_discon = np.load("sample_districts/400_discon_blocks.npy", allow_pickle=True)
+# tract_recom = np.load("sample_districts/100_recom_tract_parts_comp.npy", allow_pickle=True)[0]["dicts"]
+# block_recom = np.load("sample_districts/100_recom_block_parts_comp.npy", allow_pickle=True)[0]["dicts"]
+# block_bb = np.load("sample_districts/400_squre_block_dists.npy", allow_pickle=True)[0]["dicts"]
+# tract_discon = np.load("sample_districts/400_discon_tracts.npy", allow_pickle=True)
+# block_discon = np.load("sample_districts/400_discon_blocks.npy", allow_pickle=True)
+
+tract_recom = np.load("sample_districts/1000_recom_tract_dists.npy", allow_pickle=True)
+block_group_recom = np.load("sample_districts/1000_recom_bg_dists.npy", allow_pickle=True)
+block_recom = np.load("sample_districts/1000_recom_block_dists.npy", allow_pickle=True)
+pct_recom = np.load("sample_districts/1000_recom_pct_dists.npy", allow_pickle=True)
 
 # toydown_allow_neg = toydown_empirical_variances(tract_recom, neg_flag="allow_neg")
 # np.save("variances/tract_recom_toydown_allow_neg.npy", [toydown_allow_neg], allow_pickle=True)
 
 
-for district_type, ds in [("tract_recom", tract_recom), 
-                          ("block_recom", block_recom),
-                          ("block_bb", block_bb), ("tract_discon",tract_discon), 
-                          ("block_discon", block_discon)]:
+for district_type, ds in [
+                          ("pct", pct_recom)
+                          ("tract", tract_recom), 
+                          ("block", block_recom),
+                          ("bg", block_group_recom)
+                          # ("tract_recom", tract_recom), 
+                          # ("block_recom", block_recom),
+                          # ("block_bb", block_bb), ("tract_discon",tract_discon), 
+                          # ("block_discon", block_discon)
+                          ]:
     print("Starting {} calculations".format(district_type), flush=True)
-    frag_scores = district_frag_scores(h, ds)
+    # frag_scores = district_frag_scores(h, ds)
+    frag_scores = np.load("sample_districts/1000_recom_{}_frags.npy".format(district_type))
     analytical_toydown = analytical_district_variances(h, ds, num_attributes=7)
     toydown_allow_neg = toydown_empirical_variances(ds, neg_flag="allow_neg")
     toydown_non_neg = toydown_empirical_variances(ds, neg_flag="non_neg")
@@ -132,7 +145,8 @@ for district_type, ds in [("tract_recom", tract_recom),
                        ("ToyDown_allow_neg", toydown_allow_neg), 
                        ("ToyDown_non_neg",toydown_non_neg), 
                        ("TopDown_no_HH_cons", topdown_no_households), 
-                       ("TopDown_with_HH_cons", topdown_with_households)]
+                       ("TopDown_with_HH_cons", topdown_with_households)
+                       ]
     df = district_data_frame(frag_scores, model_variances, district_type)
-    df.to_csv("variances/{}_fragscore_v_vars.csv".format(district_type), index=False)
+    df.to_csv("variances/{}_fragscore_v_vars_1000.csv".format(district_type), index=False)
 
