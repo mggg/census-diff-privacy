@@ -1,0 +1,3 @@
+[
+  "tests/gurobi_2_test.py::test_gurobi_spark"
+]
