@@ -210,7 +210,7 @@ def plot_er_graph_gaussian_noise(data, cand, race, elect, cand_perc_col, tot_vot
     return ax
 
 def plot_elect_grid_gaussian_noise(epsilon_values, epsilon_splits, data, candidate, race, cand_perc_col,
-                                   tot_vote, sigma_matches, allow_neg=False, figsize=(10,10), filt=True,
+                                   tot_vote, sigma_matches, hh=False, figsize=(10,10), filt=True,
                                    title=None, weight=False, n_samps=32):
 
     fig, axs = plt.subplots(len(epsilon_values),len(epsilon_splits), figsize=figsize)
@@ -222,7 +222,7 @@ def plot_elect_grid_gaussian_noise(epsilon_values, epsilon_splits, data, candida
         for j in range(len(epsilon_splits)):
             eps = epsilon_values[i]
             split = epsilon_splits[j]
-            sigma = sigma_matches.query("allow_neg == @allow_neg and eps == @eps and split == @split").sigma
+            sigma = sigma_matches.query("hh == @hh and eps == @eps and split == @split").sigma
             plot_er_graph_gaussian_noise(data, candidate, race, None, cand_perc_col, tot_vote,
                                          sigma, title=False, ax=axs[i,j], filt=filt, weight=weight, n_samps=n_samps)
             axs[i,j].set_title("$\sigma$ = {}".format(round(float(sigma), 2)))
