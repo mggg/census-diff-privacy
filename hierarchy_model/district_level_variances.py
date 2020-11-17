@@ -48,7 +48,7 @@ def toydown_empirical_variances(districts, neg_flag="non_neg"):
         for j in tqdm(range(num_districts)):
             pops[j] = df[df.GEOID.astype(str).apply(lambda i: bool(districts[j][i]))].groupby("run").sum().TOTPOP.values
         print() 
-        vs = np.var(pops, axis=1)
+        vs = np.var(pops, axis=1, ddof=1)
         vrs[split] = vs
     return vrs
 
@@ -70,7 +70,7 @@ def topdown_empirical_variances(districts, household_cons=False):
         for j in tqdm(range(num_districts)):
             pops[j] = df[df.geoid.astype(str).apply(lambda i: bool(districts[j][i]))][run_cols].sum(axis=0).values
         print() 
-        vs = np.var(pops, axis=1)
+        vs = np.var(pops, axis=1, ddof=1)
         vrs[split] = vs
     return vrs
 
