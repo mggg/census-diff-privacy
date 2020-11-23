@@ -178,8 +178,11 @@ class Hierarchy_2D:
 
 
         def assign_district_to_leaves(self, district):
-            for leaf, weight in district.items():
-                self.get_node(leaf).data.weight = weight
+            # for leaf, weight in district.items():
+            #     self.get_node(leaf).data.weight = weight
+            for leaf in self.leaves():
+                leaf_id = leaf.identifier
+                leaf.data.weight = 1 if leaf_id in district else 0
 
         def assign_weights(self, node):
             if not node.is_leaf():
