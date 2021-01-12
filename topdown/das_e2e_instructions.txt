@@ -1,0 +1,68 @@
+# Instructions to set up the US Census Bureau's Disclosure Avoidance System (End-to-end) on AWS
+
+1. Create the AWS instance as mentioned in their readme here: https://github.com/uscensusbureau/census2020-das-e2e.
+
+2. Clone the repository.
+
+3. Compress the repo directory.
+        zip -r census2020-das-e2e.zip census2020-das-e2e/
+
+4. Transfer the compressed .zip file to your AWS instance. Also transfer the 1940 IPUMS data.
+        sftp -i "{YOUR_.pem_FILE}" ec2-user@{YOUR_EC2_ADDRESS}
+        put census2020-das-e2e.zip
+        put misc/EXT1940USCB.dat.zip
+
+5. Decompress the files in the AWS instance.
+        unzip census2020-das-e2e.zip
+        unzip EXT1940USCB.dat.zip
+
+6. Put the .dat file into a dir called `das_files`.
+        mkdir das_files
+        mv EXT1940USCB.dat das_files/
+
+7. Go to the census2020-das-e2e directory.
+        cd census2020-das-e2e
+
+8. Run `sh etc/standalone_prep.sh`. This script installs the necessary requirements
+   and packages needed for the program. However, the script should terminate and
+   ask for a Gurobi license.
+
+9. You will need a valid Gurobi license at this point. If you have a Gurobi account,
+   you should be able to request a license. A license comes in the form of a key
+   that is looks something random like hdjhq39887jsdhfs39 . We have an academic license,
+   and had to use an SSH tunnel to set it up. These details are also mentioned in the E2E
+   instructions.
+
+10. Enter `grbgetkey` into the command line. If it says `grbgetkey:: command not found` then you will need to do `. ~/.bashrc` 
+    (Notice the dot in this command!) Then run `sh etc/gurobi_install.sh`.
+    A Gurobi program should run and ask you for the key. You can either enter the key here, or hit
+    `ctrl-c` and do `grbgetkey {YOUR-GUROBI-LICENSE-KEY}` on the command line. This should set you
+    up with the Gurobi license.
+
+11. Doing `sh etc/standalone_prep.sh` again will error out. Comment out lines 10 and 11.
+
+12. Replace lines 17-20 on `standalone_prep.sh` with these lines:
+
+        wget http://mirrors.ibiblio.org/apache/spark/spark-2.4.7/spark-2.4.7-bin-hadoop2.7.tgz || exit 1
+        tar xzf spark-2.4.7-bin-hadoop2.7.tgz || exit 1
+        wget http://ftp.wayne.edu/apache/hadoop/common/hadoop-3.1.4/hadoop-3.1.4.tar.gz || exit 1
+        tar xzf hadoop-3.1.4.tar.gz || exit 1
+
+    Notice that these are the same lines essentially, but with different version numbers. The scripts
+    error out because these versions keep changing, and the links on the current script are dead.
+    The updated script should now run successfully.
+
+ 13. Your ~/.bashrc file should now be populated with a bunch of variables. Open that file and
+     change the spark and hadoop variables to have the version number we have above. Specifically, you will
+     want to change the lines:
+
+        export PATH=$PATH:/usr/local/spark/spark-2.4.7-bin-hadoop2.7/bin
+        export LD_LIBRARY_PATH=/usr/local/gurobi752/linux64/lib:$HOME/hadoop-3.1.4/lib/native
+        export PATH=$PATH:$HOME/spark-2.4.7-bin-hadoop2.7/bin
+        export SPARK_HOME=/home/ec2-user/spark-2.4.7-bin-hadoop2.7
+
+     (The lines above are the lines as they should be):
+     Then do
+     `. ~/.bashrc` on the command line so our environment now has these variables loaded.
+
+ 14. Finally, run `sh run_1940_standalone.sh`. The program should now run!
