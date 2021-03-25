@@ -56,7 +56,6 @@ def dist_errors(alg, ds, blocks, frags=np.ones(NUM_DISTS)):
 
         for i in tqdm(range(NUM_DISTS)):
             d = d_blks[i]
-            district_type = alg
             district_id = alg + "_{}".format(i)
             # frag_score = h.assign_district_tree_variance(d, eps=1, sensitivity=1,
             #                                              eps_splits=[np.sqrt(2)]*5)

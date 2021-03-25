@@ -128,8 +128,6 @@ num_dists = 4
 counties = ["bell","brazoria","cameron","galveston","nueces"]
 
 for county in counties:
-    pass
-
     blocks = gpd.read_file("shapes/blocks/{}_county_blocks_2010_data.shp".format(county))
     tracts = gpd.read_file("shapes/tracts/{}_county_tract_2010_data.shp".format(county))
     tract_g = Graph.from_file("shapes/tracts/{}_county_tract_2010_data.shp".format(county))
