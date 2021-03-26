@@ -248,6 +248,7 @@ def parse_reconstructed_geo_output(df, geo_col="NAME"):
     df["block"] = df["block"].str.split(expand=True)[1]
     df["bg"] = df["bg"].str.split(expand=True)[2]
     df["tract"] = df["tract"].str.split(expand=True)[2]
+    df["tract"] = df["tract"].str.replace(".","").str.pad(width=6, side='left', fillchar='0')
     df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
     return df
 
@@ -480,7 +481,7 @@ def modify_race(line, race, race_col="RACE"):
         line[race_col] = '5'
     elif race == "o":
         line[race_col] = '6'
-    elif len(race) > 2:  # multi-racial people are labeled as other.
+    elif len(race) >= 2:  # multi-racial people are labeled as other.
         line[race_col] = '6'
     else:
         raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
@@ -869,14 +870,14 @@ def convert_to_person_line_delimited(person):
     line = line + "\n"
     return line
 
-def build_person_line(serial, age, hisp, race):
+def build_person_line(serial, age, hisp, race, serial_len=8):
     """ Generates a Person line in 1940s ipums format and changes its
         `serial`, `age`, `hisp` and `race`.
         Returns the line.
     """
     person_line = get_sample_1940_person()
     person = parse_positions_person(person_line)
-    person = modify_serial(person, serial)
+    person = modify_serial(person, serial, serial_len=serial_len)
     person = modify_age(person, age)
     person = modify_hisp(person, hisp)
     person = modify_race(person, race)
@@ -884,7 +885,7 @@ def build_person_line(serial, age, hisp, race):
     person_line = convert_to_person_line_delimited(person)
     return person_line
 
-def build_hh_line(serial, gq, gqtype, state, county, enumdist):
+def build_hh_line(serial, gq, gqtype, state, county, enumdist, serial_len=8):
     """ Generates a Household line in 1940s ipums format and changes its
         `serial`, `gq`, `gqtype`, `state`, `county` and `enudmist`.
         Returns the line.
@@ -892,7 +893,7 @@ def build_hh_line(serial, gq, gqtype, state, county, enumdist):
     sample_line = get_sample_1940_hh()
     hh = parse_positions_hh(sample_line)
 
-    hh = modify_serial(hh, serial)
+    hh = modify_serial(hh, serial, serial_len=serial_len)
     hh = modify_gq(hh, gq)
     hh = modify_gqtype(hh, gqtype)
     hh = modify_state(hh, state)
@@ -1030,3 +1031,69 @@ def convert_reconstructions_to_ipums(dir_name,
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
+
+def convert_reconstructions_to_ipums_same_block(dir_name,
+                                                save_fp,
+                                                hh_size=5,
+                                                gq=1,
+                                                gqtype=0,
+                                                break_size=500):
+    """
+    Converts all the .csvs in `dir_name` into ipums format lines and saves the file to `save_fp`.
+    Differs from `convert_reconstructions_to_ipums()` in that it puts all the people in `dir_name`
+    IN THE SAME BLOCK, ie it ignores the block, block group and tract assignments from the reconstructions
+    and puts the people into the same block "0001".
+        Other arguments:
+            hh_size (int): Size of households the person lines by block are grouped into.
+                           (eg. if a block has 12 people and hh_size = 5,
+                            three households of size 5, 5, and 2 are created.)
+            serial (int) : Serial number that the reconstruction lines starts with.
+                           Everyone in a household has the same serial number, and the
+                           household also contains the serial number. Each household has
+                           a unique serial number.
+            gq (int): Group Quarters code to be added to all the household lines.
+                      A default value of 1 means that all the households are
+                      regular households (as opposed to group quarters)
+            gqtype(int): Group Quarters code to be added to all the household lines.
+                      A default value of 0 means that all the households are
+                      regular households (as opposed to say colleges or jails)
+            break_size(int): Number of blocks to write before a print() statement updates
+                      on how far along the conversion has gone. A progress bar of sorts.
+        Returns the serial number that is (last serial number used for this dir) + 1
+        i.e this return value can safely be used as a serial number for other reconstructions outside this function.
+        Also returns the number of people reconstructed.
+    """
+    # read the files, and process them
+    df = read_and_process_reconstructed_csvs(dir_name)
+    df["enumdist"] = "99999999999"
+    df = df.reset_index()
+
+    with open(save_fp, "w+") as write_file:
+        # first serial in geoid. 7 digits because a county's pop can go up to single digit millions.
+        serial = int( df["state"].iloc[0]
+                    + df["county"].iloc[0]
+                    + df["enumdist"].iloc[0]
+                    + "0000001")
+
+        person_lines = []
+
+        for (idx, row) in df.iterrows():
+
+            if idx % break_size == 0:
+                print("Writing person {} of {}.".format(idx, len(df)))
+
+            person_line = build_person_line(serial, row["age"], row["ethn"], row["race"], serial_len=len(str(serial)))
+            person_lines.append(person_line)
+
+            if (len(person_lines) == hh_size):
+                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
+                write_household_to_file(write_file, hh_line, person_lines)
+                serial += 1
+                person_lines = []
+
+        if len(person_lines) > 0:
+            # scoop up the remaining lines that are not % hh_size == 0
+            hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
+            write_household_to_file(write_file, hh_line, person_lines)
+            serial += 1
+            person_lines = []
