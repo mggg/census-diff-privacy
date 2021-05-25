@@ -4,6 +4,7 @@
 import os
 import numpy as np
 import pandas as pd
+import zipfile
 pd.set_option('display.max_columns', None)
 
 def read_df_1940(person_file):
@@ -187,11 +188,43 @@ def pops_by_enumdist(input_file, state_fips_code):
 
     return enumdist_pops
 
-def pop_of_state_by_enumdist(input_file, state_fips_code):
+def pops_by_enumdist_delim(input_file, state_fips_code):
+    """ Returns the population in each enumdist of the state `state_fips_code`.
+        `input_file` is the filepath of the .dat file used as an input to TopDown.
+
+        Returns a Dict of the form {
+            (county_1, enumdist_1) : pop_1,
+            (county_1, enumdist_2) : pop_2,
+                   ...
+            (county_n, enumdist_x) : pop_k,
+        }
+    """
+    enumdist_pops = dict()
+
+    with open(input_file, "r") as raw_file:
+        for line in raw_file:
+            if line[0] == 'H' and line[53:55] == state_fips_code:
+                # we have a household from this state!
+                pop = int(line[15:17]) # pop of household
+                county = int(line[55:59])
+                enumdist = int(line[124:128])
+
+                # add pop
+                if (county, enumdist) in enumdist_pops.keys():
+                    enumdist_pops[(county, enumdist)] += pop
+                else:
+                    enumdist_pops[(county, enumdist)] = pop
+
+    return enumdist_pops
+
+def pop_of_state_by_enumdist(input_file, state_fips_code, delim=False):
     """ Returns a DataFrame with the populations of each enumdist in the state `state_fips_code`.
         `input_file` is the filepath of the .dat file used as input to TopDown.
     """
-    enumdist_pops = pops_by_enumdist(input_file, state_fips_code)
+    if delim:
+        enumdist_pops = pops_by_enumdist_delim(input_file, state_fips_code)
+    else:
+        enumdist_pops = pops_by_enumdist(input_file, state_fips_code)
 
     # populate a DataFrame with the enumdist populations
     main_df = pd.DataFrame(columns=["State", "County", "Enumdist", "TOTPOP"])
@@ -247,7 +280,7 @@ def parse_reconstructed_geo_output(df, geo_col="NAME"):
     df[["block", "bg", "tract", "county", "state"]] = df[geo_col].str.split(", ", expand=True)
     df["block"] = df["block"].str.split(expand=True)[1]
     df["bg"] = df["bg"].str.split(expand=True)[2]
-    df["tract"] = df["tract"].str.split(expand=True)[2]
+    df["tract"] = df["tract"].str.split(expand=True)[2].str.replace(".", "").str.pad(6, "right", "0")
     df["county"] = df["county"].str.split(expand=True).iloc[:,:-1].apply(lambda x: ' '.join(x), axis=1)
     return df
 
@@ -480,7 +513,7 @@ def modify_race(line, race, race_col="RACE"):
         line[race_col] = '5'
     elif race == "o":
         line[race_col] = '6'
-    elif len(race) > 2:  # multi-racial people are labeled as other.
+    elif len(race) >= 2:  # multi-racial people are labeled as other.
         line[race_col] = '6'
     else:
         raise Exception("Race not in [w, b, i, a, h, o]: {}".format(race))
@@ -869,14 +902,14 @@ def convert_to_person_line_delimited(person):
     line = line + "\n"
     return line
 
-def build_person_line(serial, age, hisp, race):
+def build_person_line(serial, age, hisp, race, serial_len=8):
     """ Generates a Person line in 1940s ipums format and changes its
         `serial`, `age`, `hisp` and `race`.
         Returns the line.
     """
     person_line = get_sample_1940_person()
     person = parse_positions_person(person_line)
-    person = modify_serial(person, serial)
+    person = modify_serial(person, serial, serial_len=serial_len)
     person = modify_age(person, age)
     person = modify_hisp(person, hisp)
     person = modify_race(person, race)
@@ -884,7 +917,7 @@ def build_person_line(serial, age, hisp, race):
     person_line = convert_to_person_line_delimited(person)
     return person_line
 
-def build_hh_line(serial, gq, gqtype, state, county, enumdist):
+def build_hh_line(serial, gq, gqtype, state, county, enumdist, serial_len=8):
     """ Generates a Household line in 1940s ipums format and changes its
         `serial`, `gq`, `gqtype`, `state`, `county` and `enudmist`.
         Returns the line.
@@ -892,7 +925,7 @@ def build_hh_line(serial, gq, gqtype, state, county, enumdist):
     sample_line = get_sample_1940_hh()
     hh = parse_positions_hh(sample_line)
 
-    hh = modify_serial(hh, serial)
+    hh = modify_serial(hh, serial, serial_len=serial_len)
     hh = modify_gq(hh, gq)
     hh = modify_gqtype(hh, gqtype)
     hh = modify_state(hh, state)
@@ -1004,7 +1037,11 @@ def convert_reconstructions_to_ipums(dir_name,
     counter = 0 # counter at a block level
 
     with open(save_fp, "w+") as write_file:
-        serial = 1
+        # serial = 1
+        serial = int( df["state"].iloc[0]
+                    + df["county"].iloc[0]
+                    + df["enumdist"].iloc[0]
+                    + "0000001")
         for ((state, county, tract, bg, block), group) in groups:
 
             counter += 1
@@ -1015,18 +1052,174 @@ def convert_reconstructions_to_ipums(dir_name,
             person_lines = []
 
             for (_, row) in block_df.iterrows():
-                person_line = build_person_line(serial, row["age"], row["ethn"], row["race"])
+                person_line = build_person_line(serial, row["age"], row["ethn"], row["race"], serial_len=len(str(serial)))
                 person_lines.append(person_line)
 
                 if (len(person_lines) == hh_size):
-                    hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
+                    hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
                     write_household_to_file(write_file, hh_line, person_lines)
                     serial += 1
                     person_lines = []
 
             if len(person_lines) > 0:
                 # scoop up the remaining lines that are not % hh_size == 0
-                hh_line = build_hh_line(serial, gq, gqtype, state, county, row["enumdist"])
+                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
                 write_household_to_file(write_file, hh_line, person_lines)
                 serial += 1
                 person_lines = []
+
+def convert_reconstructions_to_ipums_same_block(dir_name,
+                                                save_fp,
+                                                hh_size=5,
+                                                gq=1,
+                                                gqtype=0):
+    """
+    Converts all the .csvs in `dir_name` into ipums format lines and saves the file to `save_fp`.
+    Differs from `convert_reconstructions_to_ipums()` in that it puts all the people in `dir_name`
+    IN THE SAME BLOCK, ie it ignores the block, block group and tract assignments from the reconstructions
+    and puts the people into the same block "0001".
+        Other arguments:
+            hh_size (int): Size of households the person lines by block are grouped into.
+                           (eg. if a block has 12 people and hh_size = 5,
+                            three households of size 5, 5, and 2 are created.)
+            serial (int) : Serial number that the reconstruction lines starts with.
+                           Everyone in a household has the same serial number, and the
+                           household also contains the serial number. Each household has
+                           a unique serial number.
+            gq (int): Group Quarters code to be added to all the household lines.
+                      A default value of 1 means that all the households are
+                      regular households (as opposed to group quarters)
+            gqtype(int): Group Quarters code to be added to all the household lines.
+                      A default value of 0 means that all the households are
+                      regular households (as opposed to say colleges or jails)
+    """
+    # read the files, and process them
+    df = read_and_process_reconstructed_csvs(dir_name)
+    df["enumdist"] = "99999999999"
+    counter = 0 # counter at a block level
+
+    with open(save_fp, "w+") as write_file:
+        # first serial in geoid. 7 digits because a county's pop can go up to single digit millions.
+        serial = int( df["state"].iloc[0]
+                    + df["county"].iloc[0]
+                    + df["enumdist"].iloc[0]
+                    + "0000001")
+
+        person_lines = []
+
+        for (_, row) in df.iterrows():
+            person_line = build_person_line(serial, row["age"], row["ethn"], row["race"], serial_len=len(str(serial)))
+            person_lines.append(person_line)
+
+            if (len(person_lines) == hh_size):
+                hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
+                write_household_to_file(write_file, hh_line, person_lines)
+                serial += 1
+                person_lines = []
+
+        if len(person_lines) > 0:
+            # scoop up the remaining lines that are not % hh_size == 0
+            hh_line = build_hh_line(serial, gq, gqtype, row["state"], row["county"], row["enumdist"], serial_len=len(str(serial)))
+            write_household_to_file(write_file, hh_line, person_lines)
+            serial += 1
+            person_lines = []
+
+def num_lines_by_type(filename):
+    """ Returns the number of Household lines and Person Lines in the file
+        named  `filename`
+    """
+    h_lines = 0
+    p_lines = 0
+
+    with open(filename, "r") as file:
+        for line in file:
+            if line[0] == "H":
+                h_lines += 1
+            elif line[0] == "P":
+                p_lines += 1
+
+    return h_lines, p_lines
+
+def label_split_and_budget(df, eps_split, eps_budget, five_counties=False):
+    """
+    """
+    if eps_split == "mid":
+        df["split"] = "mid-heavy"
+    elif eps_split == "top":
+        df["split"] = "top-heavy"
+    elif eps_split == "bottom":
+        df["split"] = "bottom-heavy"
+    elif eps_split == "eq" or eps_split == "equal":
+        df["split"] = "equal"
+    else:
+        raise ValueError("Split value is {}, but was expecting one of [equal/eq, top, mid, heavy]".format(eps_split))
+
+    if five_counties:
+        df["epsilon"] = "1"
+        return df
+
+
+    if eps_budget == "0pt25":
+        df["epsilon"] = "0.25"
+    elif eps_budget == "0pt5":
+        df["epsilon"] = "0.5"
+    elif eps_budget == "1":
+        df["epsilon"] = "1"
+    elif eps_budget == "2":
+        df["epsilon"] = "2"
+    else:
+        raise ValueError("Budget value is {}, but was expecting one of [0pt25, 0pt5, 1, 2]".format(eps_budget))
+
+    return df
+
+def add_runoff(runoff, df, precinct_col="Precinct"):
+    """ Adds the vote data in `runoff` to `df`.
+    """
+    try:
+        df[precinct_col] = df[precinct_col].astype(int).astype(str)
+    except:
+        df[precinct_col] = df[precinct_col].astype(str)
+
+    runoff = runoff[runoff["CNTYVTD"].isin(df["Precinct"])]
+
+    df = df.merge(runoff, how="left", left_on="Precinct", right_on="CNTYVTD")
+    return df
+
+def combine_csvs(csv_dir, runoff_file, with_hh, five_counties=False):
+    """ Combines all the csvs in `csv_dir`, labels their budget and split, and then
+        merges the `runoff_filepath` file to it to combine vote data.
+        `with_hh` is a Bool that is True if the csvs are runs with Household Constraints.
+    """
+    dfs = []
+
+    for root, dirs, files in os.walk(csv_dir):
+        for file in files:
+
+            if os.path.splitext(file)[1] != ".csv":
+                continue
+
+            if with_hh:
+                eps_split = file[:-4].split("_")[3]
+                eps_budget = file[:-4].split("_")[4]
+            else:
+                eps_split = file[:-4].split("_")[2]
+                eps_budget = file[:-4].split("_")[3]
+
+            df = pd.read_csv(os.path.join(root, file))
+            df = label_split_and_budget(df, eps_split, eps_budget, five_counties=five_counties)
+            df = add_runoff(runoff_file, df)
+
+            dfs.append(df)
+
+    main_df = pd.concat(dfs)
+
+    return main_df
+
+def extract_from_zip(zipfile_fp,
+                     destination_fp):
+    """ Unzips the file `zipfile_fp` at the filepath location `destination_fp`.
+    """
+    print("Extracting {}".format(zipfile_fp))
+
+    with zipfile.ZipFile(zipfile_fp, 'r') as zip_ref:
+        zip_ref.extractall(destination_fp)
