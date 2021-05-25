@@ -1108,6 +1108,7 @@ def convert_reconstructions_to_ipums_same_block(dir_name,
         person_lines = []
 
         for (_, row) in df.iterrows():
+
             person_line = build_person_line(serial, row["age"], row["ethn"], row["race"], serial_len=len(str(serial)))
             person_lines.append(person_line)
 
